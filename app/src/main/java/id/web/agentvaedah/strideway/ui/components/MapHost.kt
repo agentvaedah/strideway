@@ -106,9 +106,8 @@ fun MapHost(
                 else -> Unit
             }
         }
+        // addObserver replays ON_START/ON_RESUME up to the current state, so no manual catch-up here.
         lifecycle.addObserver(observer)
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) mapView.onStart()
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) mapView.onResume()
         onDispose {
             lifecycle.removeObserver(observer)
             mapView.onPause()
