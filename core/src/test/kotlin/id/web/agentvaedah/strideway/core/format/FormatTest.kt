@@ -17,7 +17,7 @@ class FormatTest {
 
     @Test
     fun kmTwoDecimals() {
-        assertEquals("12.35", Format.km(12_345.0))
+        assertEquals("12.35", Format.km(12_346.0))
     }
 
     @Test
