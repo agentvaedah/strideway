@@ -77,10 +77,10 @@ object Gpx {
 
 internal fun parseTime(text: String): Long? = try {
     Instant.parse(text.trim()).toEpochMilli()
-} catch (_: DateTimeParseException) {
+} catch (e: DateTimeParseException) {
     try {
         OffsetDateTime.parse(text.trim()).toInstant().toEpochMilli()
-    } catch (_: DateTimeParseException) {
+    } catch (e: DateTimeParseException) {
         null
     }
 }

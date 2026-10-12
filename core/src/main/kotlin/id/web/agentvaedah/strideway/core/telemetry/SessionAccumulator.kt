@@ -59,6 +59,7 @@ class SessionAccumulator(
         val prev = lastPos
         val dt = (timeMs - lastPosMs) / 1000.0
         val step = if (prev != null) Geo.distanceM(prev, pos) else 0.0
+        if (prev != null && dt <= 0) return
         if (prev != null && dt > 0 && step / dt > MAX_PLAUSIBLE_MPS) return
 
         val speed = when {

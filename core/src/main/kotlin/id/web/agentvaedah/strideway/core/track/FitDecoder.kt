@@ -38,6 +38,7 @@ object FitDecoder {
         val points = ArrayList<TrackPoint>()
         var sport: Sport? = null
         var lastTimestamp = 0L
+        var hasTimestamp = false
         var i = headerSize
 
         while (i < end) {
@@ -50,9 +51,10 @@ object FitDecoder {
                 if (offset < (lastTimestamp and 0x1F)) ts += 0x20
                 lastTimestamp = ts
                 val def = defs[local] ?: throw TrackParseException("Pesan FIT tanpa definisi (lokal $local)")
-                val values = readValues(bytes, i, def)
+                val values = readValues(bytes, i, def, end)
                 i += dataLength(def)
-                if (def.global == MSG_RECORD) toPoint(values, ts)?.let(points::add)
+                // A compressed time before any full timestamp has no reference point.
+                if (def.global == MSG_RECORD) toPoint(values, if (hasTimestamp) ts else 0L)?.let(points::add)
                 continue
             }
             val local = header and 0x0F
@@ -63,6 +65,7 @@ object FitDecoder {
                 val global = readUInt(bytes, i + 2, 2, bigEndian).toInt()
                 val count = bytes[i + 4].toInt() and 0xFF
                 i += 5
+                if (i + count * 3 > end) throw TrackParseException("Definisi FIT terpotong")
                 val fields = ArrayList<FieldDef>(count)
                 repeat(count) {
                     fields += FieldDef(bytes[i].toInt() and 0xFF, bytes[i + 1].toInt() and 0xFF, bytes[i + 2].toInt() and 0xFF)
@@ -70,8 +73,10 @@ object FitDecoder {
                 }
                 var devBytes = 0
                 if (hasDev) {
+                    if (i >= end) throw TrackParseException("Definisi FIT terpotong")
                     val devCount = bytes[i].toInt() and 0xFF
                     i++
+                    if (i + devCount * 3 > end) throw TrackParseException("Definisi FIT terpotong")
                     repeat(devCount) {
                         devBytes += bytes[i + 1].toInt() and 0xFF
                         i += 3
@@ -80,9 +85,12 @@ object FitDecoder {
                 defs[local] = Definition(global, bigEndian, fields, devBytes)
             } else {
                 val def = defs[local] ?: throw TrackParseException("Pesan FIT tanpa definisi (lokal $local)")
-                val values = readValues(bytes, i, def)
+                val values = readValues(bytes, i, def, end)
                 i += dataLength(def)
-                values[FIELD_TIMESTAMP]?.let { lastTimestamp = it }
+                values[FIELD_TIMESTAMP]?.let {
+                    lastTimestamp = it
+                    hasTimestamp = true
+                }
                 when (def.global) {
                     MSG_RECORD -> toPoint(values, values[FIELD_TIMESTAMP] ?: lastTimestamp)?.let(points::add)
                     MSG_SPORT -> sport = sport ?: sportOf(values[0])
@@ -97,8 +105,8 @@ object FitDecoder {
     private fun dataLength(def: Definition) = def.fields.sumOf { it.size } + def.devBytes
 
     /** Field number to raw value; invalid (all-ones / max) values are left out. */
-    private fun readValues(bytes: ByteArray, start: Int, def: Definition): Map<Int, Long> {
-        if (start + dataLength(def) > bytes.size) throw TrackParseException("Data FIT terpotong")
+    private fun readValues(bytes: ByteArray, start: Int, def: Definition, end: Int): Map<Int, Long> {
+        if (start + dataLength(def) > end) throw TrackParseException("Data FIT terpotong")
         val out = HashMap<Int, Long>()
         var i = start
         for (f in def.fields) {

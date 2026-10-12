@@ -32,7 +32,8 @@ object GattParsers {
         var wheelTime: Int? = null
         var crankRevs: Int? = null
         var crankTime: Int? = null
-        if ((flags and 0x01) != 0 && v.size >= i + 6) {
+        if ((flags and 0x01) != 0) {
+            if (v.size < i + 6) return Csc(null, null, null, null)
             wheelRevs = v.u32(i)
             wheelTime = v.u16(i + 4)
             i += 6
