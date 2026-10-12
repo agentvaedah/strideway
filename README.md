@@ -8,6 +8,22 @@ Backend multi-tenant (FastAPI, PostGIS, CT106) dan unggah otomatis ke Strava ada
 
 Kode ini ditulis di laptop tanpa Android SDK dan tanpa akses keluar jaringan, jadi **belum pernah dikompilasi atau dijalankan**. Logika inti sudah dipisah ke modul `:core` (Kotlin murni) beserta unit test, dan nilai acuan test dihitung terpisah dengan Python. Langkah pertama di mesin yang punya Android Studio adalah build dan menjalankan test di bawah, lalu memperbaiki error kompilasi yang mungkin muncul.
 
+## Dapatkan APK tanpa Android Studio (GitHub Actions)
+
+Repo ini membawa workflow `.github/workflows/android.yml` yang menjalankan unit test dan membuat APK debug setiap kali ada push.
+
+1. Ekstrak ZIP project, lalu buat repository kosong di GitHub (jangan centang "Add a README").
+2. Dari folder hasil ekstrak:
+   ```
+   git remote add origin https://github.com/<akun>/strideway.git
+   git push -u origin master
+   ```
+3. Buka tab **Actions** di GitHub, pilih run **Android** terbaru, tunggu sampai hijau (sekitar 10 menit untuk run pertama).
+4. Di bagian **Artifacts**, unduh `strideway-debug-apk`. Isinya ZIP berisi `app-debug.apk`.
+5. Salin `app-debug.apk` ke ponsel, buka, lalu izinkan "Instal dari sumber tidak dikenal" bila diminta.
+
+Bila run merah, buka langkah yang gagal, salin log errornya, lalu kirim untuk diperbaiki. Untuk menjalankan ulang tanpa push, pakai tombol **Run workflow**.
+
 ## Build
 
 Kebutuhan: Android Studio Ladybug (2024.2) atau lebih baru, JDK 17, Android SDK 35.
