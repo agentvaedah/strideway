@@ -14,6 +14,8 @@ import id.web.agentvaedah.strideway.data.db.SensorDao
 import id.web.agentvaedah.strideway.data.db.StridewayDatabase
 import id.web.agentvaedah.strideway.data.db.TrackPointDao
 import id.web.agentvaedah.strideway.data.remote.HttpClientFactory
+import id.web.agentvaedah.strideway.data.remote.sync.DisabledRemoteSync
+import id.web.agentvaedah.strideway.data.remote.sync.RemoteSyncApi
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +44,10 @@ object AppModule {
     @Provides
     @Singleton
     fun httpClient(): HttpClient = HttpClientFactory.create()
+
+    @Provides
+    @Singleton
+    fun remoteSync(): RemoteSyncApi = DisabledRemoteSync()
 
     /** Outlives screens; used by the recording engine and BLE hub. */
     @Provides
