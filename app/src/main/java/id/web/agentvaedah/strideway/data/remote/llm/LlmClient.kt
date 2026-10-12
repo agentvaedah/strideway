@@ -13,6 +13,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
@@ -68,6 +69,10 @@ class LlmClient @Inject constructor(
             LlmResult.Failure("Balasan ${cfg.provider.label} tidak bisa dibaca.")
         } catch (e: IllegalArgumentException) {
             LlmResult.Failure("Balasan ${cfg.provider.label} tidak bisa dibaca.")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LlmResult.Failure("Permintaan ke ${cfg.provider.label} gagal: ${e.message ?: e.javaClass.simpleName}. Periksa base URL.")
         }
     }
 

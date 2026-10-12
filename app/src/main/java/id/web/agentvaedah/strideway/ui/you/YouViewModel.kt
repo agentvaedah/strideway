@@ -14,6 +14,7 @@ import id.web.agentvaedah.strideway.data.files.BackupManager
 import id.web.agentvaedah.strideway.data.files.TrackFileIo
 import id.web.agentvaedah.strideway.data.prefs.PrivacyZoneSetting
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
+import id.web.agentvaedah.strideway.service.RecordingController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -93,6 +94,7 @@ class YouViewModel @Inject constructor(
     private val files: TrackFileIo,
     sensorDao: SensorDao,
     ble: BleHub,
+    private val recording: RecordingController,
 ) : ViewModel() {
     val athlete: StateFlow<Athlete?> = settings.athlete.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val profileSaved: StateFlow<Boolean> = settings.profileSaved.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -138,6 +140,11 @@ class YouViewModel @Inject constructor(
     }
 
     fun restoreBackup(uri: Uri) {
+        // Restore wipes the activity table, which would orphan the live session's track points.
+        if (recording.isStartingOrActive) {
+            _backup.value = BackupStatus.Failed("Selesaikan rekaman yang sedang berjalan sebelum restore.")
+            return
+        }
         _backup.value = BackupStatus.Working
         viewModelScope.launch {
             val text = files.readText(uri).getOrElse {

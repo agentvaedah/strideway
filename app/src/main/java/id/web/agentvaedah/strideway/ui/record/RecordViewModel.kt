@@ -49,9 +49,9 @@ class RecordViewModel @Inject constructor(
 
     val navRoute: StateFlow<NavRoute?> = settings.activeRouteId.flatMapLatest { id ->
         if (id == null) {
-            flowOf(null)
+            flowOf<NavRoute?>(null)
         } else {
-            flow {
+            flow<NavRoute?> {
                 val r = routes.get(id)
                 emit(r?.let { NavRoute(it.id, it.name, routes.points(id).map { p -> LatLon(p.lat, p.lon) }) })
             }

@@ -11,6 +11,7 @@ import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.core.telemetry.DeadReckoning
 import id.web.agentvaedah.strideway.core.telemetry.LiveMetrics
 import id.web.agentvaedah.strideway.core.telemetry.SessionAccumulator
+import id.web.agentvaedah.strideway.core.track.TrackStats
 import id.web.agentvaedah.strideway.data.ble.BleHub
 import id.web.agentvaedah.strideway.data.ble.SensorReading
 import id.web.agentvaedah.strideway.data.ble.SensorStatus
@@ -25,6 +26,7 @@ import id.web.agentvaedah.strideway.di.AppScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.cos
@@ -83,6 +86,10 @@ class RecordingController @Inject constructor(
     val gpsError: StateFlow<String?> = _gpsError.asStateFlow()
 
     private val lock = Mutex()
+    private val starting = AtomicBoolean(false)
+
+    /** True between start() and the first published Active state; the service uses it on launch. */
+    val isStartingOrActive: Boolean get() = starting.get() || _state.value is RecordingState.Active
     private var session: Session? = null
     private val jobs = mutableListOf<Job>()
 
@@ -108,6 +115,10 @@ class RecordingController @Inject constructor(
 
     fun start(sport: Sport) {
         if (_state.value is RecordingState.Active) return
+        // Guards double taps and the interrupted-session recovery while the row is being created.
+        if (!starting.compareAndSet(false, true)) return
+        // Started before the DB insert so the call happens while the app is still in the foreground.
+        ContextCompat.startForegroundService(context, Intent(context, RecordingService::class.java))
         scope.launch {
             val athlete = settings.athlete.first()
             ble.wheelCircumferenceM = settings.wheelCircumferenceM.first()
@@ -118,7 +129,7 @@ class RecordingController @Inject constructor(
             }
             _gpsError.value = null
             publish(startMs)
-            ContextCompat.startForegroundService(context, Intent(context, RecordingService::class.java))
+            starting.set(false)
             ble.connectSaved()
             launchCollectors()
         }
@@ -241,7 +252,7 @@ class RecordingController @Inject constructor(
                 activityId = ses.activityId,
                 sport = ses.sport,
                 metrics = ses.acc.tick(now),
-                path = ses.path.toList(),
+                path = TrackStats.downsample(ses.path, LIVE_PATH_MAX),
                 position = ses.position,
                 headingDeg = ses.heading,
                 elevationProfile = ses.profile.toList(),
@@ -257,7 +268,8 @@ class RecordingController @Inject constructor(
             val ses = session ?: return
             ses.buffer.toList().also { ses.buffer.clear() }
         }
-        withContext(Dispatchers.IO) { activities.appendPoints(batch) }
+        // Points already removed from the buffer must reach the DB even if stop() cancels this job.
+        withContext(NonCancellable + Dispatchers.IO) { activities.appendPoints(batch) }
     }
 
     fun togglePause() {
@@ -298,7 +310,7 @@ class RecordingController @Inject constructor(
 
     /** Saves a session that was cut off when the process died, using what reached the database. */
     suspend fun recoverInterrupted(): Long? = withContext(Dispatchers.IO) {
-        if (session != null) return@withContext null
+        if (session != null || starting.get()) return@withContext null
         val stale = activities.interruptedSession() ?: return@withContext null
         activities.finishFromPoints(stale.id, settings.athlete.first())
         activities.get(stale.id)?.id
@@ -319,6 +331,7 @@ class RecordingController @Inject constructor(
         const val PROFILE_STEP_M = 25.0
         const val PROFILE_MAX = 240
         const val MIN_SAVE_DISTANCE_M = 10.0
+        const val LIVE_PATH_MAX = 2_000
     }
 }
 

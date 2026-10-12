@@ -55,19 +55,26 @@ class CoachViewModel @Inject constructor(
         if (trimmed.isEmpty() || _sending.value) return
         _sending.value = true
         viewModelScope.launch {
-            val cfg = settings.llm.first()
-            chat.add(ChatRole.USER, trimmed, null)
-            // Error bubbles are shown to the athlete but never sent back to the model.
-            val history = chat.history()
-                .filter { it.role == ChatRole.USER || it.role == ChatRole.ASSISTANT }
-                .takeLast(HISTORY_LIMIT)
-                .map { LlmMessage(it.role, it.content) }
-                .dropWhile { it.role != ChatRole.USER }
-            when (val r = llm.complete(cfg, systemPrompt(), history)) {
-                is LlmResult.Ok -> chat.add(ChatRole.ASSISTANT, r.text, providerLabel(cfg))
-                is LlmResult.Failure -> chat.add(ChatRole.ERROR, r.reason, providerLabel(cfg))
+            try {
+                ask(trimmed)
+            } finally {
+                _sending.value = false
             }
-            _sending.value = false
+        }
+    }
+
+    private suspend fun ask(trimmed: String) {
+        val cfg = settings.llm.first()
+        chat.add(ChatRole.USER, trimmed, null)
+        // Error bubbles are shown to the athlete but never sent back to the model.
+        val history = chat.history()
+            .filter { it.role == ChatRole.USER || it.role == ChatRole.ASSISTANT }
+            .takeLast(HISTORY_LIMIT)
+            .map { LlmMessage(it.role, it.content) }
+            .dropWhile { it.role != ChatRole.USER }
+        when (val r = llm.complete(cfg, systemPrompt(), history)) {
+            is LlmResult.Ok -> chat.add(ChatRole.ASSISTANT, r.text, providerLabel(cfg))
+            is LlmResult.Failure -> chat.add(ChatRole.ERROR, r.reason, providerLabel(cfg))
         }
     }
 

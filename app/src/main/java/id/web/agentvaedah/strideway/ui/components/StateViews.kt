@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -96,6 +97,8 @@ fun BackTopBar(title: String, onBack: () -> Unit, actions: @Composable () -> Uni
         },
         actions = { Row { actions() } },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Bg),
+        // The enclosing Scaffold already pads for the status bar.
+        windowInsets = WindowInsets(0),
     )
 }
 

@@ -28,7 +28,9 @@ import id.web.agentvaedah.strideway.data.remote.routing.RoutingException
 import id.web.agentvaedah.strideway.data.repo.ActivityRepository
 import id.web.agentvaedah.strideway.data.repo.RouteRepository
 import id.web.agentvaedah.strideway.data.repo.toTrackPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -126,7 +128,10 @@ class MapsViewModel @Inject constructor(
         }
         _terrain.value = TerrainState.Loading
         terrainJob = viewModelScope.launch {
-            _terrain.value = terrain.render(o, lat, lon, zoom).fold(
+            val result = terrain.render(o, lat, lon, zoom)
+            // runCatching in the renderer also captures cancellation; a superseded job must not publish.
+            ensureActive()
+            _terrain.value = result.fold(
                 onSuccess = { TerrainState.Shown(it) },
                 onFailure = { TerrainState.Failed("Data elevasi tidak bisa dimuat. ${it.message ?: "Periksa koneksi."}") },
             )
@@ -271,6 +276,10 @@ class MapsViewModel @Inject constructor(
                 fail(e.message ?: "Jawaban AI tidak bisa dipakai")
             } catch (e: RoutingException) {
                 fail(e.message ?: "Rute gagal dibuat")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                fail("Rute gagal dibuat: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }

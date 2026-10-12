@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
-import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
@@ -78,7 +78,7 @@ fun CoachScreen(onOpenKeys: () -> Unit, vm: CoachViewModel = hiltViewModel()) {
                 Text("${cfg.provider.label} · ${cfg.model}", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
             }
             if (!messages.isNullOrEmpty()) TextButton(onClick = { confirmClear = true }) { Text("Hapus chat") }
-            IconButton(onClick = onOpenKeys) { Icon(Icons.Outlined.Key, contentDescription = "Atur API key dan model") }
+            IconButton(onClick = onOpenKeys) { Icon(Icons.Outlined.VpnKey, contentDescription = "Atur API key dan model") }
         }
         HorizontalDivider(color = Palette.Outline, modifier = Modifier.padding(top = 8.dp))
 

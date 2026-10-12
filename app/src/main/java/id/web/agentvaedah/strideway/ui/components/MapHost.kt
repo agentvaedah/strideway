@@ -97,12 +97,14 @@ fun MapHost(
     val readyCallback by rememberUpdatedState(onMapReady)
 
     DisposableEffect(lifecycle, mapView) {
+        var started = false
+        var resumed = false
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                Lifecycle.Event.ON_START -> { mapView.onStart(); started = true }
+                Lifecycle.Event.ON_RESUME -> { mapView.onResume(); resumed = true }
+                Lifecycle.Event.ON_PAUSE -> { mapView.onPause(); resumed = false }
+                Lifecycle.Event.ON_STOP -> { mapView.onStop(); started = false }
                 else -> Unit
             }
         }
@@ -110,8 +112,8 @@ fun MapHost(
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
-            mapView.onPause()
-            mapView.onStop()
+            if (resumed) mapView.onPause()
+            if (started) mapView.onStop()
             mapView.onDestroy()
         }
     }
@@ -213,6 +215,7 @@ object MapLayers {
         if (existing != null) {
             existing.setCoordinates(quad)
             existing.setImage(bitmap)
+            style.getLayerAs<RasterLayer>(id)?.setProperties(PropertyFactory.rasterOpacity(opacity))
             return
         }
         style.addSource(ImageSource(id, quad, bitmap))

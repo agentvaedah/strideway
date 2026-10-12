@@ -43,13 +43,13 @@ fun RecordScreen(onOpenActivity: (Long) -> Unit, vm: RecordViewModel = hiltViewM
     val recovered by vm.recovered.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // Volume keys belong to this screen only while it is on top.
-    DisposableEffect(Unit) {
-        vm.setKeysActive(true)
+    val active = state is RecordingState.Active
+
+    // Volume keys act as head-unit buttons only while a recording is on screen.
+    DisposableEffect(active) {
+        vm.setKeysActive(active)
         onDispose { vm.setKeysActive(false) }
     }
-
-    val active = state is RecordingState.Active
     DisposableEffect(active) {
         val window = (context as? android.app.Activity)?.window
         if (active) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

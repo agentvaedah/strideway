@@ -1,6 +1,7 @@
 package id.web.agentvaedah.strideway.di
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import dagger.Module
 import dagger.Provides
@@ -17,6 +18,7 @@ import id.web.agentvaedah.strideway.data.remote.HttpClientFactory
 import id.web.agentvaedah.strideway.data.remote.sync.DisabledRemoteSync
 import id.web.agentvaedah.strideway.data.remote.sync.RemoteSyncApi
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,5 +55,7 @@ object AppModule {
     @Provides
     @Singleton
     @AppScope
-    fun appScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun appScope(): CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e -> Log.e("Strideway", "Background task failed", e) },
+    )
 }
