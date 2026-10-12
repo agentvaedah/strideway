@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder mark until the real Strideway logo exists: a stroked "S". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M66,42 C66,36 60,33 54,33 C47,33 42,37 42,43 C42,50 49,52 54,54 C60,56 66,58 66,65 C66,71 61,75 54,75 C47,75 42,72 42,66"
+        android:strokeColor="#FC4C02"
+        android:strokeWidth="8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+</vector>

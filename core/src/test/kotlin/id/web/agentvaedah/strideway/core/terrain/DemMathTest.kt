@@ -54,8 +54,8 @@ class DemMathTest {
         val awayFromLight = DemMath.hillshadeColor(30f, 135f) ushr 24
         val flat = DemMath.hillshadeColor(0f, -1f) ushr 24
         assertEquals(58, flat)
-        assertTrue(towardLight < flat), "lit slope should be lighter than flat"
-        assertTrue(awayFromLight > flat), "shaded slope should be darker than flat"
+        assertTrue(towardLight < flat, "lit slope should be lighter than flat")
+        assertTrue(awayFromLight > flat, "shaded slope should be darker than flat")
     }
 
     @Test
