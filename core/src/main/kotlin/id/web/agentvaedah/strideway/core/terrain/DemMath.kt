@@ -3,6 +3,7 @@ package id.web.agentvaedah.strideway.core.terrain
 import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /** Terrain analytics on Terrarium-encoded DEM tiles. Colours are ARGB ints. */
@@ -85,6 +86,19 @@ object DemMath {
         if (aspect < 0 || slope < 2f) return 0x00000000
         val sector = (((aspect + 22.5f) % 360f) / 45f).toInt().coerceIn(0, 7)
         return aspectColors[sector]
+    }
+
+    /**
+     * Shaded relief lit from the north-west at 45°; returned as black with alpha so it darkens
+     * whatever base map sits underneath instead of washing it out.
+     */
+    fun hillshadeColor(slopeDeg: Float, aspectDeg: Float, azimuthDeg: Double = 315.0, altitudeDeg: Double = 45.0): Int {
+        val zenith = Math.toRadians(90.0 - altitudeDeg)
+        val slope = Math.toRadians(slopeDeg.toDouble())
+        val facing = if (aspectDeg < 0) 0.0 else sin(zenith) * sin(slope) * cos(Math.toRadians(azimuthDeg - aspectDeg))
+        val light = (cos(zenith) * cos(slope) + facing).coerceIn(0.0, 1.0)
+        val alpha = ((1.0 - light) * 200).toInt().coerceIn(0, 255)
+        return alpha shl 24
     }
 
     fun aspectLabel(aspect: Float): String {

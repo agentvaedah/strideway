@@ -1,5 +1,6 @@
 package id.web.agentvaedah.strideway.core.physio
 
+import id.web.agentvaedah.strideway.core.model.Athlete
 import id.web.agentvaedah.strideway.core.model.Gender
 import kotlin.math.exp
 
@@ -17,6 +18,17 @@ object TrainingLoad {
         }
         return durationMin * ratio * weight
     }
+
+    /**
+     * Without a heart rate sensor, assumes an endurance effort at 60% of heart rate reserve
+     * so rides still count toward fitness. Shown in the UI as an estimate.
+     */
+    fun trimpOrEstimate(durationMin: Double, avgHr: Double?, athlete: Athlete): Double {
+        val hr = avgHr ?: (athlete.hrRest + ESTIMATED_RESERVE * (athlete.hrMax - athlete.hrRest))
+        return trimp(durationMin, hr, athlete.hrRest, athlete.hrMax, athlete.gender)
+    }
+
+    private const val ESTIMATED_RESERVE = 0.6
 
     data class DailyLoad(val epochDay: Long, val load: Double)
 

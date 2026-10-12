@@ -1,6 +1,7 @@
 package id.web.agentvaedah.strideway.core.terrain
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import kotlin.math.atan
 
@@ -45,6 +46,16 @@ class DemMathTest {
         assertEquals(0f, r.slopeDeg[4], 0f)
         assertEquals(-1f, r.aspectDeg[4], 0f)
         assertEquals(0, DemMath.aspectColor(r.aspectDeg[4], r.slopeDeg[4]))
+    }
+
+    @Test
+    fun hillshadeDarkensSlopesFacingAwayFromLight() {
+        val towardLight = DemMath.hillshadeColor(30f, 315f) ushr 24
+        val awayFromLight = DemMath.hillshadeColor(30f, 135f) ushr 24
+        val flat = DemMath.hillshadeColor(0f, -1f) ushr 24
+        assertEquals(58, flat)
+        assertTrue(towardLight < flat), "lit slope should be lighter than flat"
+        assertTrue(awayFromLight > flat), "shaded slope should be darker than flat"
     }
 
     @Test
