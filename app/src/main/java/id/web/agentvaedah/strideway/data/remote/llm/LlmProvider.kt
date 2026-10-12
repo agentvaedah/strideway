@@ -9,7 +9,7 @@ enum class LlmProviderId(
     OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini"),
     GEMINI("Google Gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash"),
     GROQ("Groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
-    ANTHROPIC("Anthropic", "https://api.anthropic.com/v1", "claude-sonnet-5-5"),
+    ANTHROPIC("Anthropic", "https://api.anthropic.com/v1", "claude-opus-5-5"),
     OLLAMA("Ollama / 9Router", "http://192.168.1.10:11434/v1", "llama3.1", keyRequired = false),
 }
 
