@@ -1,22 +1,12 @@
 package id.web.agentvaedah.strideway.ui.record
 
-import android.Manifest
-import android.os.Build
 import android.view.WindowManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,19 +16,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.service.RecordingState
 import id.web.agentvaedah.strideway.ui.theme.Palette
 
 @Composable
-fun RecordScreen(onOpenActivity: (Long) -> Unit, vm: RecordViewModel = hiltViewModel()) {
+fun RecordScreen(onOpenActivity: (Long) -> Unit, onOpenWeather: () -> Unit, vm: RecordViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val recovered by vm.recovered.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -77,107 +64,89 @@ fun RecordScreen(onOpenActivity: (Long) -> Unit, vm: RecordViewModel = hiltViewM
     }
 
     when (val s = state) {
-        is RecordingState.Active -> LiveDashboard(s, vm)
-        else -> ReadyPanel(vm)
+        is RecordingState.Active -> LiveDashboard(s, vm, onOpenWeather)
+        else -> StandbyScreen(vm)
     }
 }
 
 @Composable
-private fun ReadyPanel(vm: RecordViewModel) {
-    val sport by vm.sport.collectAsStateWithLifecycle()
-    val navRoute by vm.navRoute.collectAsStateWithLifecycle()
-    val gpsError by vm.gpsError.collectAsStateWithLifecycle()
-    var permissionDenied by remember { mutableStateOf(false) }
-    var gpsOff by remember { mutableStateOf(false) }
-
-    val permissions = buildList {
-        add(Manifest.permission.ACCESS_FINE_LOCATION)
-        add(Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
-        addAll(vm.blePermissions())
-    }.distinct().toTypedArray()
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        val locationOk = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        permissionDenied = !locationOk
-        if (locationOk) {
-            if (vm.gpsEnabled()) vm.start() else gpsOff = true
-        }
-    }
-
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Siap merekam", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Saat merekam, tombol Volume Atas menjeda atau melanjutkan, Volume Bawah berganti tampilan peta dan metrik.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Palette.TextMuted,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FilterChip(selected = sport == Sport.RIDE, onClick = { vm.selectSport(Sport.RIDE) }, label = { Text("Ride") })
-            FilterChip(selected = sport == Sport.RUN, onClick = { vm.selectSport(Sport.RUN) }, label = { Text("Run") })
-        }
-        navRoute?.let { r ->
-            Spacer(Modifier.height(16.dp))
-            Text("Rute navigasi: ${r.name}", style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = vm::clearNavRoute) { Text("Lepas rute") }
-        }
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { launcher.launch(permissions) },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-        ) {
-            Text(if (sport == Sport.RIDE) "Mulai ride" else "Mulai run", style = MaterialTheme.typography.titleMedium)
-        }
-        val message = when {
-            permissionDenied -> "Izin lokasi ditolak. Strideway butuh GPS untuk merekam jarak dan rute. Buka Pengaturan > Aplikasi > Strideway > Izin."
-            gpsOff -> "GPS mati. Aktifkan Lokasi di panel cepat, lalu tekan Mulai lagi."
-            gpsError != null -> gpsError
-            else -> null
-        }
-        if (message != null) {
-            Spacer(Modifier.height(16.dp))
-            Text(message, color = Palette.Error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        }
-    }
-}
-
-@Composable
-private fun LiveDashboard(s: RecordingState.Active, vm: RecordViewModel) {
+private fun LiveDashboard(s: RecordingState.Active, vm: RecordViewModel, onOpenWeather: () -> Unit) {
     val display by vm.display.collectAsStateWithLifecycle()
     val mapBase by vm.mapBase.collectAsStateWithLifecycle()
     val navRoute by vm.navRoute.collectAsStateWithLifecycle()
     val athlete by vm.athlete.collectAsStateWithLifecycle()
+    val nav by vm.nav.collectAsStateWithLifecycle()
+    val workout by vm.workoutState.collectAsStateWithLifecycle()
+    val reroute by vm.rerouteLine.collectAsStateWithLifecycle()
+    val camera by vm.camera.collectAsStateWithLifecycle()
+    val tilt3d by vm.tilt3d.collectAsStateWithLifecycle()
+    val headingUp by vm.headingUp.collectAsStateWithLifecycle()
+    val routeAlerts by vm.routeAlerts.collectAsStateWithLifecycle()
+    val savedRoutes by vm.savedRoutes.collectAsStateWithLifecycle()
+    val weather by vm.weather.collectAsStateWithLifecycle()
     var confirmStop by remember { mutableStateOf(false) }
+    var pickRoute by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
-        if (display != DisplayMode.METRICS) {
-            LiveMap(
-                state = s,
-                base = mapBase,
-                navRoute = navRoute?.points.orEmpty(),
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
-        }
-        if (display != DisplayMode.MAP) {
-            MetricsDrawer(
+        when (display) {
+            // Maximised: numbers only, the way Strava fills the screen while riding.
+            DisplayMode.METRICS -> ExpandedMetrics(
                 state = s,
                 athlete = athlete,
-                fullHeight = display == DisplayMode.METRICS,
+                onMinimize = { vm.setDisplay(DisplayMode.SPLIT) },
                 modifier = Modifier.fillMaxWidth().weight(1f),
+                nav = nav,
+                workout = workout,
             )
+            else -> {
+                Column(Modifier.fillMaxWidth().weight(1f)) {
+                    val mapOnly = display == DisplayMode.MAP
+                    LiveMap(
+                        state = s,
+                        base = mapBase,
+                        navRoute = reroute ?: navRoute?.points.orEmpty(),
+                        nav = nav,
+                        camera = camera,
+                        tilt3d = tilt3d,
+                        headingUp = headingUp,
+                        routeAlerts = routeAlerts,
+                        bottomInset = 0.dp,
+                        onCamera = vm::setCamera,
+                        onToggle3d = vm::toggle3d,
+                        onToggleHeadingUp = vm::toggleHeadingUp,
+                        onToggleAlerts = vm::toggleRouteAlerts,
+                        onSwitchRoute = { pickRoute = true },
+                        weather = weather,
+                        onOpenWeather = onOpenWeather,
+                        modifier = Modifier.fillMaxWidth().weight(if (mapOnly) 1f else if (workout != null) 0.65f else 0.75f),
+                    )
+                    if (!mapOnly) {
+                        MinimizedMetrics(
+                            state = s,
+                            athlete = athlete,
+                            onMaximize = { vm.setDisplay(DisplayMode.METRICS) },
+                            // A workout adds its strip, so the metrics share grows a little to keep both readable.
+                            modifier = Modifier.fillMaxWidth().weight(if (workout != null) 0.35f else 0.25f).heightIn(min = 150.dp),
+                            workout = workout,
+                        )
+                    }
+                }
+            }
         }
         ControlBar(
             paused = s.metrics.manualPaused,
             onPause = vm::togglePause,
             onStop = { confirmStop = true },
             onCycle = vm::cycleDisplay,
+        )
+    }
+
+    if (pickRoute) {
+        RouteSwitchSheet(
+            routes = savedRoutes,
+            activeId = navRoute?.id,
+            onSelect = { id -> vm.selectRoute(id); pickRoute = false },
+            onDismiss = { pickRoute = false },
         )
     }
 

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Strideway</string>
+    <string name="splash_tagline">Rekam jalurmu. Baca medannya.</string>
+    <string name="splash_skip">Lewati</string>
     <string name="recording_channel">Perekaman aktivitas</string>
     <string name="recording_channel_desc">Notifikasi tetap selama ride atau run direkam</string>
 </resources>

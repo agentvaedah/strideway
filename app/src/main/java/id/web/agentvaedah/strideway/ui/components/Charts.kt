@@ -34,7 +34,11 @@ fun LineChart(
     height: Dp = 120.dp,
     fillFirst: Boolean = false,
     zeroLine: Boolean = false,
+    /** 0..1 along the x axis; draws a vertical playback cursor when set. */
+    cursor: Float? = null,
 ) {
+    val outline = Palette.Outline
+    val cursorColor = Palette.Text
     Canvas(
         modifier
             .fillMaxWidth()
@@ -54,7 +58,7 @@ fun LineChart(
         fun y(v: Float) = pad + h - (v - min) / (max - min) * h
 
         if (zeroLine && min < 0 && max > 0) {
-            drawLine(Palette.Outline, Offset(0f, y(0f)), Offset(size.width, y(0f)), strokeWidth = 1.dp.toPx())
+            drawLine(outline, Offset(0f, y(0f)), Offset(size.width, y(0f)), strokeWidth = 1.dp.toPx())
         }
         series.forEachIndexed { index, s ->
             if (s.values.size < 2) return@forEachIndexed
@@ -84,14 +88,19 @@ fun LineChart(
                 ),
             )
         }
+        cursor?.let { c ->
+            val x = c.coerceIn(0f, 1f) * size.width
+            drawLine(cursorColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
+        }
     }
 }
 
 /** Offline route sketch from stored coordinates; no map tiles, so the feed renders without network. */
 @Composable
 fun TrackThumbnail(path: List<LatLon>, modifier: Modifier = Modifier, color: Color = Palette.Accent) {
+    val background = Palette.SurfaceHigh
     Canvas(modifier.semantics { contentDescription = "Sketsa jalur aktivitas" }) {
-        drawRect(Palette.SurfaceHigh)
+        drawRect(background)
         if (path.size < 2) return@Canvas
         val midLat = path.sumOf { it.lat } / path.size
         val kx = cos(Math.toRadians(midLat))

@@ -28,8 +28,16 @@ class Converters {
         RoutePointEntity::class,
         ChatMessageEntity::class,
         SensorEntity::class,
+        BestEffortEntity::class,
+        MediaEntity::class,
+        PlaceEntity::class,
+        ComponentEntity::class,
+        ComponentEventEntity::class,
+        ManeuverEntity::class,
+        TrainingPlanEntity::class,
+        PlannedSessionEntity::class,
     ],
-    version = 1,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -39,4 +47,9 @@ abstract class StridewayDatabase : RoomDatabase() {
     abstract fun routeDao(): RouteDao
     abstract fun chatDao(): ChatDao
     abstract fun sensorDao(): SensorDao
+    abstract fun bestEffortDao(): BestEffortDao
+    abstract fun mediaDao(): MediaDao
+    abstract fun placeDao(): PlaceDao
+    abstract fun gearDao(): GearDao
+    abstract fun trainingDao(): TrainingDao
 }

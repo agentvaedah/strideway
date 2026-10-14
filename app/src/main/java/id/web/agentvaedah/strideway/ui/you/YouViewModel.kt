@@ -14,6 +14,9 @@ import id.web.agentvaedah.strideway.data.files.BackupManager
 import id.web.agentvaedah.strideway.data.files.TrackFileIo
 import id.web.agentvaedah.strideway.data.prefs.PrivacyZoneSetting
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
+import id.web.agentvaedah.strideway.data.prefs.ThemeMode
+import id.web.agentvaedah.strideway.data.prefs.BikeType
+import id.web.agentvaedah.strideway.data.prefs.UserProfile
 import id.web.agentvaedah.strideway.service.RecordingController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +29,9 @@ import javax.inject.Inject
 
 /** Text-field form state; values stay strings until validation so partial input is allowed. */
 data class ProfileForm(
+    val name: String,
+    val bikeType: BikeType,
+    val bikeName: String,
     val gender: Gender,
     val height: String,
     val weight: String,
@@ -70,8 +76,11 @@ data class ProfileForm(
         )
     }
 
+    fun toProfile() = UserProfile(name, bikeType, bikeName)
+
     companion object {
-        fun from(a: Athlete) = ProfileForm(
+        fun from(a: Athlete, u: UserProfile) = ProfileForm(
+            u.name, u.bikeType, u.bikeName,
             a.gender, trim(a.heightCm), trim(a.weightKg), a.age.toString(), a.hrMax.toString(),
             a.hrRest.toString(), a.ftpWatts.toString(), trim(a.bikeWeightKg),
         )
@@ -101,6 +110,12 @@ class YouViewModel @Inject constructor(
     val privacy: StateFlow<PrivacyZoneSetting> = settings.privacyZone.stateIn(viewModelScope, SharingStarted.Eagerly, PrivacyZoneSetting())
     val sensors: StateFlow<List<SensorEntity>> = sensorDao.observeAll().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val sensorStatus: StateFlow<Map<String, SensorStatus>> = ble.status
+    val profile: StateFlow<UserProfile> = settings.profile.stateIn(viewModelScope, SharingStarted.Eagerly, UserProfile())
+    val themeMode: StateFlow<ThemeMode> = settings.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
+
+    fun setThemeMode(m: ThemeMode) {
+        viewModelScope.launch { settings.setThemeMode(m) }
+    }
 
     private val _form = MutableStateFlow<ProfileForm?>(null)
     val form: StateFlow<ProfileForm?> = _form.asStateFlow()
@@ -112,7 +127,7 @@ class YouViewModel @Inject constructor(
     val backupStatus: StateFlow<BackupStatus> = _backup.asStateFlow()
 
     init {
-        viewModelScope.launch { _form.value = ProfileForm.from(settings.athlete.first()) }
+        viewModelScope.launch { _form.value = ProfileForm.from(settings.athlete.first(), settings.profile.first()) }
     }
 
     fun edit(transform: (ProfileForm) -> ProfileForm) {
@@ -121,9 +136,11 @@ class YouViewModel @Inject constructor(
     }
 
     fun save() {
-        val a = _form.value?.toAthlete() ?: return
+        val f = _form.value ?: return
+        val a = f.toAthlete() ?: return
         viewModelScope.launch {
             settings.saveAthlete(a)
+            settings.saveProfile(f.toProfile())
             _saved.value = true
         }
     }
@@ -153,7 +170,7 @@ class YouViewModel @Inject constructor(
             }
             _backup.value = backup.restore(text).fold(
                 onSuccess = {
-                    _form.value = ProfileForm.from(settings.athlete.first())
+                    _form.value = ProfileForm.from(settings.athlete.first(), settings.profile.first())
                     BackupStatus.Done("Restore selesai: ${it.activities} aktivitas, ${it.routes} rute.")
                 },
                 onFailure = { BackupStatus.Failed("Restore gagal: ${it.message}") },

@@ -2,18 +2,24 @@ package id.web.agentvaedah.strideway.data.repo
 
 import id.web.agentvaedah.strideway.core.geo.Polyline
 import id.web.agentvaedah.strideway.core.model.ActivitySummary
+import id.web.agentvaedah.strideway.core.stats.StatActivity
 import id.web.agentvaedah.strideway.core.model.Athlete
 import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.core.model.Track
 import id.web.agentvaedah.strideway.core.model.TrackPoint
 import id.web.agentvaedah.strideway.core.physio.TrainingLoad
+import id.web.agentvaedah.strideway.core.records.BestEfforts
+import id.web.agentvaedah.strideway.core.records.EffortPoint
 import id.web.agentvaedah.strideway.core.telemetry.LiveMetrics
 import id.web.agentvaedah.strideway.core.track.ActivityStatsCalculator
 import id.web.agentvaedah.strideway.core.track.TrackStats
 import id.web.agentvaedah.strideway.data.db.ActivityDao
 import id.web.agentvaedah.strideway.data.db.ActivityEntity
 import id.web.agentvaedah.strideway.data.db.ActivitySource
+import id.web.agentvaedah.strideway.data.db.BestEffortDao
+import id.web.agentvaedah.strideway.data.db.BestEffortEntity
+import id.web.agentvaedah.strideway.data.db.RouteSource
 import id.web.agentvaedah.strideway.data.db.TrackPointDao
 import id.web.agentvaedah.strideway.data.db.TrackPointEntity
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +33,9 @@ import javax.inject.Singleton
 class ActivityRepository @Inject constructor(
     private val activityDao: ActivityDao,
     private val pointDao: TrackPointDao,
+    private val effortDao: BestEffortDao,
+    private val routes: RouteRepository,
+    private val media: MediaStore,
 ) {
     fun activities(): Flow<List<ActivityEntity>> = activityDao.observeFinished()
 
@@ -72,6 +81,7 @@ class ActivityRepository @Inject constructor(
                 polyline = encodePath(pts.map { LatLon(it.lat, it.lon) }),
             ),
         )
+        computeEfforts(id, existing.sport, pts)
     }
 
     /** Recovers a session whose process died mid-ride by recomputing everything from stored points. */
@@ -130,11 +140,65 @@ class ActivityRepository @Inject constructor(
                 polyline = encodePath(points.map { it.latLon }),
             ),
         )
+        computeEfforts(entity.id, entity.sport, pointDao.forActivity(entity.id))
+    }
+
+    private suspend fun computeEfforts(id: Long, sport: Sport, pts: List<TrackPointEntity>) {
+        val effortPoints = pts.filter { !it.interpolated }.map { EffortPoint(it.lat, it.lon, it.timeMs) }
+        val rows = BestEfforts.computeAll(effortPoints, sport).map { (key, e) ->
+            BestEffortEntity(id, key.name, e.seconds, e.startIdx, e.endIdx)
+        }
+        effortDao.replaceFor(id, rows)
+        activityDao.setEffortsVersion(id, BestEfforts.VERSION)
+    }
+
+    /**
+     * Computes best efforts for activities saved before records existed (or before an algorithm change),
+     * a few at a time so a long history does not hold the database. Safe to call repeatedly.
+     */
+    suspend fun backfillEfforts() {
+        while (true) {
+            val ids = activityDao.needingEfforts(BestEfforts.VERSION, BACKFILL_BATCH)
+            if (ids.isEmpty()) return
+            for (id in ids) {
+                val a = activityDao.get(id) ?: continue
+                computeEfforts(id, a.sport, pointDao.forActivity(id))
+            }
+        }
     }
 
     suspend fun rename(id: Long, name: String) = activityDao.rename(id, name.trim())
 
-    suspend fun delete(id: Long) = activityDao.delete(id)
+    suspend fun updateMeta(id: Long, name: String, sport: Sport, description: String) {
+        val before = activityDao.get(id) ?: return
+        activityDao.updateMeta(id, name.trim().ifBlank { defaultName(sport, before.startMs) }, sport, description.trim())
+        // Efforts are per sport (a run has no 40 km target), so a sport change needs them recomputed.
+        if (before.sport != sport) computeEfforts(id, sport, pointDao.forActivity(id))
+    }
+
+    suspend fun setVisibility(id: Long, hideStartM: Int, hideEndM: Int, hideMap: Boolean) =
+        activityDao.updateVisibility(id, hideStartM.coerceAtLeast(0), hideEndM.coerceAtLeast(0), hideMap)
+
+    /** Permanently removes points outside [fromMs]..[toMs] and recomputes every number from what is left. */
+    suspend fun crop(id: Long, fromMs: Long, toMs: Long, athlete: Athlete) {
+        pointDao.deleteOutside(id, fromMs, toMs)
+        finishFromPoints(id, athlete)
+    }
+
+    /** Recomputes stats, polyline and efforts from the stored points, e.g. after the athlete profile changed. */
+    suspend fun refresh(id: Long, athlete: Athlete) = finishFromPoints(id, athlete)
+
+    suspend fun saveAsRoute(id: Long): Long? {
+        val a = activityDao.get(id) ?: return null
+        val pts = pointDao.forActivity(id).filter { !it.interpolated }.map { it.toTrackPoint() }
+        if (pts.size < 2) return null
+        return routes.save(a.name, RouteSource.ACTIVITY, pts, null)
+    }
+
+    suspend fun delete(id: Long) {
+        activityDao.delete(id)
+        media.deleteAll(id)
+    }
 
     private fun encodePath(path: List<LatLon>): String = Polyline.encode(TrackStats.downsample(path, MAX_POLYLINE_POINTS))
 
@@ -142,6 +206,7 @@ class ActivityRepository @Inject constructor(
 
     companion object {
         private const val MAX_POLYLINE_POINTS = 400
+        private const val BACKFILL_BATCH = 10
 
         fun defaultName(sport: Sport, startMs: Long): String {
             val hour = Instant.ofEpochMilli(startMs).atZone(ZoneId.systemDefault()).hour
@@ -155,3 +220,5 @@ class ActivityRepository @Inject constructor(
         }
     }
 }
+
+fun ActivityEntity.toStat() = StatActivity(sport, startMs, distanceM, elevationGainM, movingMs, avgHr)

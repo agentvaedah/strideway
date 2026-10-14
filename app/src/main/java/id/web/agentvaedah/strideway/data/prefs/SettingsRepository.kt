@@ -9,11 +9,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import id.web.agentvaedah.strideway.core.model.Athlete
 import id.web.agentvaedah.strideway.core.model.Gender
 import id.web.agentvaedah.strideway.core.model.LatLon
+import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.data.remote.llm.LlmProviderId
 import id.web.agentvaedah.strideway.data.remote.llm.LlmSettings
 import kotlinx.coroutines.flow.Flow
@@ -31,10 +33,22 @@ data class PrivacyZoneSetting(
     val radiusM: Double = 500.0,
 )
 
-enum class MapBase(val label: String) {
+enum class MapBase(val label: String, val needsMapbox: Boolean = false) {
     STANDARD("Standar"),
+    OSM("OSM"),
     SATELLITE("Satelit"),
     HYBRID("Hybrid"),
+    TOPO("Topo"),
+    MAPBOX_STREETS("Mapbox Streets", needsMapbox = true),
+    MAPBOX_OUTDOORS("Mapbox Outdoors", needsMapbox = true),
+    MAPBOX_SATELLITE("Mapbox Satelit", needsMapbox = true),
+}
+
+/** Extra layers drawn over the base map, toggled independently. */
+enum class MapOverlay(val label: String) {
+    POI("Tempat menarik"),
+    BIKE_LANES("Jalur sepeda"),
+    HEATMAP("Heatmap pribadi"),
 }
 
 enum class TerrainOverlay(val label: String) {
@@ -43,6 +57,53 @@ enum class TerrainOverlay(val label: String) {
     SLOPE("Kemiringan"),
     AVALANCHE("Lereng >30°"),
     ASPECT("Arah lereng"),
+}
+
+enum class BikeType(val label: String) {
+    ROAD("Road bike"),
+    GRAVEL("Gravel"),
+    MTB("MTB"),
+    FOLDING("Sepeda lipat"),
+    CITY("City / hybrid"),
+    EBIKE("E-bike"),
+    TT("Time trial"),
+    NONE("Tidak bersepeda"),
+}
+
+data class UserProfile(val name: String = "", val bikeType: BikeType = BikeType.ROAD, val bikeName: String = "")
+
+data class FuelSettings(
+    val enabled: Boolean = true,
+    val drinkEveryMin: Int = 0,
+    val eatEveryMin: Int = 0,
+)
+
+enum class ThemeMode(val label: String) {
+    SYSTEM("Ikuti sistem"),
+    LIGHT("Terang"),
+    DARK("Gelap"),
+}
+
+/** Where spoken cues come from. API voices fall back to [DEVICE] when offline or without a key. */
+enum class TtsProviderId(val label: String, val keyId: String?) {
+    DEVICE("Suara perangkat", null),
+    OPENAI("OpenAI", "OPENAI"),
+    ELEVENLABS("ElevenLabs", "TTS_ELEVENLABS"),
+}
+
+data class VoiceSettings(
+    val enabled: Boolean = true,
+    val provider: TtsProviderId = TtsProviderId.DEVICE,
+    val elevenVoiceId: String = DEFAULT_ELEVEN_VOICE,
+    val split: Boolean = true,
+    val route: Boolean = true,
+    val pause: Boolean = true,
+    val heartRate: Boolean = true,
+    val routeAlerts: Boolean = true,
+) {
+    companion object {
+        const val DEFAULT_ELEVEN_VOICE = "21m00Tcm4TlvDq8ikWAM"
+    }
 }
 
 @Singleton
@@ -67,6 +128,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext context: Contex
 
         val mapBase = stringPreferencesKey("map_base")
         val terrain = stringPreferencesKey("map_terrain")
+        val overlays = stringSetPreferencesKey("map_overlays")
+        val maps3d = booleanPreferencesKey("map_3d")
+        val mapsSport = stringPreferencesKey("map_sport")
 
         val llmProvider = stringPreferencesKey("llm_provider")
         fun llmModel(p: LlmProviderId) = stringPreferencesKey("llm_model_${p.name}")
@@ -74,6 +138,30 @@ class SettingsRepository @Inject constructor(@ApplicationContext context: Contex
 
         val wheel = doublePreferencesKey("wheel_circumference")
         val activeRoute = longPreferencesKey("active_route")
+
+        val voiceEnabled = booleanPreferencesKey("voice_enabled")
+        val voiceProvider = stringPreferencesKey("voice_provider")
+        val elevenVoice = stringPreferencesKey("voice_eleven_voice_id")
+        val cueSplit = booleanPreferencesKey("cue_split")
+        val cueRoute = booleanPreferencesKey("cue_route")
+        val cuePause = booleanPreferencesKey("cue_pause")
+        val cueHr = booleanPreferencesKey("cue_hr")
+        val routeAlerts = booleanPreferencesKey("route_alerts_enabled")
+
+        val theme = stringPreferencesKey("ui_theme")
+
+        val userName = stringPreferencesKey("user_name")
+        val bikeType = stringPreferencesKey("user_bike_type")
+        val bikeName = stringPreferencesKey("user_bike_name")
+
+        val joinedChallenges = stringSetPreferencesKey("challenges_joined")
+        val awards = stringSetPreferencesKey("challenge_awards")
+
+        val mapboxToken = stringPreferencesKey("mapbox_token")
+
+        val fuelEnabled = booleanPreferencesKey("fuel_enabled")
+        val fuelDrink = intPreferencesKey("fuel_drink_min")
+        val fuelEat = intPreferencesKey("fuel_eat_min")
     }
 
     val athlete: Flow<Athlete> = store.data.map { p ->
@@ -143,6 +231,32 @@ class SettingsRepository @Inject constructor(@ApplicationContext context: Contex
         store.edit { it[Keys.mapBase] = b.name }
     }
 
+    val mapOverlays: Flow<Set<MapOverlay>> = store.data.map { p ->
+        p[Keys.overlays].orEmpty().mapNotNull { runCatching { MapOverlay.valueOf(it) }.getOrNull() }.toSet()
+    }.distinctUntilChanged()
+
+    suspend fun setMapOverlay(o: MapOverlay, on: Boolean) {
+        store.edit { p ->
+            val cur = p[Keys.overlays].orEmpty()
+            p[Keys.overlays] = if (on) cur + o.name else cur - o.name
+        }
+    }
+
+    val maps3d: Flow<Boolean> = store.data.map { it[Keys.maps3d] ?: false }.distinctUntilChanged()
+
+    suspend fun setMaps3d(on: Boolean) {
+        store.edit { it[Keys.maps3d] = on }
+    }
+
+    /** Sport chosen on the Maps tab; decides the routing profile for planned and drawn routes. */
+    val mapsSport: Flow<Sport> = store.data.map { p ->
+        p[Keys.mapsSport]?.let { runCatching { Sport.valueOf(it) }.getOrNull() } ?: Sport.RIDE
+    }.distinctUntilChanged()
+
+    suspend fun setMapsSport(s: Sport) {
+        store.edit { it[Keys.mapsSport] = s.name }
+    }
+
     suspend fun setTerrainOverlay(o: TerrainOverlay) {
         store.edit { it[Keys.terrain] = o.name }
     }
@@ -183,5 +297,96 @@ class SettingsRepository @Inject constructor(@ApplicationContext context: Contex
 
     suspend fun setActiveRouteId(id: Long?) {
         store.edit { p -> if (id == null) p.remove(Keys.activeRoute) else p[Keys.activeRoute] = id }
+    }
+
+    val voice: Flow<VoiceSettings> = store.data.map { p ->
+        val d = VoiceSettings()
+        VoiceSettings(
+            enabled = p[Keys.voiceEnabled] ?: d.enabled,
+            provider = p[Keys.voiceProvider]?.let { runCatching { TtsProviderId.valueOf(it) }.getOrNull() } ?: d.provider,
+            elevenVoiceId = p[Keys.elevenVoice] ?: d.elevenVoiceId,
+            split = p[Keys.cueSplit] ?: d.split,
+            route = p[Keys.cueRoute] ?: d.route,
+            pause = p[Keys.cuePause] ?: d.pause,
+            heartRate = p[Keys.cueHr] ?: d.heartRate,
+            routeAlerts = p[Keys.routeAlerts] ?: d.routeAlerts,
+        )
+    }.distinctUntilChanged()
+
+    suspend fun saveVoice(v: VoiceSettings) {
+        store.edit { p ->
+            p[Keys.voiceEnabled] = v.enabled
+            p[Keys.voiceProvider] = v.provider.name
+            p[Keys.elevenVoice] = v.elevenVoiceId.trim().ifEmpty { VoiceSettings.DEFAULT_ELEVEN_VOICE }
+            p[Keys.cueSplit] = v.split
+            p[Keys.cueRoute] = v.route
+            p[Keys.cuePause] = v.pause
+            p[Keys.cueHr] = v.heartRate
+            p[Keys.routeAlerts] = v.routeAlerts
+        }
+    }
+
+    suspend fun setRouteAlerts(on: Boolean) {
+        store.edit { it[Keys.routeAlerts] = on }
+    }
+
+    val themeMode: Flow<ThemeMode> = store.data.map { p ->
+        p[Keys.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
+    }.distinctUntilChanged()
+
+    suspend fun setThemeMode(m: ThemeMode) {
+        store.edit { it[Keys.theme] = m.name }
+    }
+
+    val profile: Flow<UserProfile> = store.data.map { p ->
+        UserProfile(
+            name = p[Keys.userName] ?: "",
+            bikeType = p[Keys.bikeType]?.let { runCatching { BikeType.valueOf(it) }.getOrNull() } ?: BikeType.ROAD,
+            bikeName = p[Keys.bikeName] ?: "",
+        )
+    }.distinctUntilChanged()
+
+    suspend fun saveProfile(u: UserProfile) {
+        store.edit { p ->
+            p[Keys.userName] = u.name.trim().take(40)
+            p[Keys.bikeType] = u.bikeType.name
+            p[Keys.bikeName] = u.bikeName.trim().take(40)
+        }
+    }
+
+    val joinedChallenges: Flow<Set<String>> = store.data.map { it[Keys.joinedChallenges] ?: emptySet() }.distinctUntilChanged()
+
+    suspend fun setChallengeJoined(id: String, joined: Boolean) {
+        store.edit { p ->
+            val cur = p[Keys.joinedChallenges] ?: emptySet()
+            p[Keys.joinedChallenges] = if (joined) cur + id else cur - id
+        }
+    }
+
+    /** Award keys as "CHALLENGE@yyyy-MM"; kept forever so past months stay in the trophy case. */
+    val awards: Flow<Set<String>> = store.data.map { it[Keys.awards] ?: emptySet() }.distinctUntilChanged()
+
+    suspend fun addAwards(keys: Collection<String>) {
+        if (keys.isEmpty()) return
+        store.edit { p -> p[Keys.awards] = (p[Keys.awards] ?: emptySet()) + keys }
+    }
+
+    val mapboxToken: Flow<String?> = store.data.map { it[Keys.mapboxToken]?.takeIf(String::isNotBlank) }.distinctUntilChanged()
+
+    suspend fun setMapboxToken(token: String?) {
+        store.edit { p -> if (token.isNullOrBlank()) p.remove(Keys.mapboxToken) else p[Keys.mapboxToken] = token.trim() }
+    }
+
+    /** Intervals of 0 mean "use the plan computed from duration and temperature". */
+    val fuel: Flow<FuelSettings> = store.data.map { p ->
+        FuelSettings(p[Keys.fuelEnabled] ?: true, p[Keys.fuelDrink] ?: 0, p[Keys.fuelEat] ?: 0)
+    }.distinctUntilChanged()
+
+    suspend fun saveFuel(f: FuelSettings) {
+        store.edit { p ->
+            p[Keys.fuelEnabled] = f.enabled
+            p[Keys.fuelDrink] = f.drinkEveryMin.coerceIn(0, 120)
+            p[Keys.fuelEat] = f.eatEveryMin.coerceIn(0, 180)
+        }
     }
 }

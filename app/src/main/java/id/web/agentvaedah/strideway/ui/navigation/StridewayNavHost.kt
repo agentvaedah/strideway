@@ -21,11 +21,19 @@ import id.web.agentvaedah.strideway.ui.home.HomeScreen
 import id.web.agentvaedah.strideway.ui.maps.MapsScreen
 import id.web.agentvaedah.strideway.ui.record.RecordScreen
 import id.web.agentvaedah.strideway.ui.theme.Palette
+import id.web.agentvaedah.strideway.ui.weather.WeatherScreen
+import id.web.agentvaedah.strideway.ui.training.TrainingScreen
 import id.web.agentvaedah.strideway.ui.you.DevicesScreen
+import id.web.agentvaedah.strideway.ui.you.FuelScreen
+import id.web.agentvaedah.strideway.ui.you.GarageScreen
+import id.web.agentvaedah.strideway.ui.you.MapSettingsScreen
+import id.web.agentvaedah.strideway.ui.you.ProfileScreen
+import id.web.agentvaedah.strideway.ui.you.SettingsScreen
 import id.web.agentvaedah.strideway.ui.you.PrivacyZoneScreen
+import id.web.agentvaedah.strideway.ui.you.VoiceSettingsScreen
 import id.web.agentvaedah.strideway.ui.you.YouScreen
 
-private val tabRoutes = setOf(Routes.HOME, Routes.MAPS, Routes.RECORD, Routes.COACH, Routes.YOU)
+private val tabRoutes = setOf(Routes.HOME, Routes.MAPS, Routes.RECORD, Routes.TRAINING, Routes.YOU)
 
 @Composable
 fun StridewayNavHost(navController: NavHostController, recording: Boolean) {
@@ -53,6 +61,7 @@ fun StridewayNavHost(navController: NavHostController, recording: Boolean) {
                         onOpenActivity = { navController.navigate(Routes.activity(it)) },
                         onStartRecording = { selectTab(Routes.RECORD) },
                         onImport = { selectTab(Routes.MAPS) },
+                        onOpenGarage = { navController.navigate(Routes.GARAGE) },
                     )
                 }
                 composable(Routes.MAPS) {
@@ -60,19 +69,29 @@ fun StridewayNavHost(navController: NavHostController, recording: Boolean) {
                         onNavigateRoute = { selectTab(Routes.RECORD) },
                         onOpenActivity = { navController.navigate(Routes.activity(it)) },
                         onOpenKeys = { navController.navigate(Routes.COACH_KEYS) },
+                        onOpenWeather = { navController.navigate(Routes.WEATHER) },
                     )
                 }
                 composable(Routes.RECORD) {
-                    RecordScreen(onOpenActivity = { navController.navigate(Routes.activity(it)) })
+                    RecordScreen(
+                        onOpenActivity = { navController.navigate(Routes.activity(it)) },
+                        onOpenWeather = { navController.navigate(Routes.WEATHER) },
+                    )
+                }
+                composable(Routes.TRAINING) {
+                    TrainingScreen(
+                        onOpenCoach = { navController.navigate(Routes.COACH) },
+                        onRide = { selectTab(Routes.RECORD) },
+                    )
                 }
                 composable(Routes.COACH) {
-                    CoachScreen(onOpenKeys = { navController.navigate(Routes.COACH_KEYS) })
+                    CoachScreen(onOpenKeys = { navController.navigate(Routes.COACH_KEYS) }, onBack = { navController.popBackStack() })
                 }
                 composable(Routes.YOU) {
                     YouScreen(
-                        onOpenDevices = { navController.navigate(Routes.DEVICES) },
-                        onOpenPrivacy = { navController.navigate(Routes.PRIVACY) },
-                        onOpenKeys = { navController.navigate(Routes.COACH_KEYS) },
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                        onOpenActivity = { navController.navigate(Routes.activity(it)) },
                     )
                 }
                 composable(
@@ -84,6 +103,29 @@ fun StridewayNavHost(navController: NavHostController, recording: Boolean) {
                 composable(Routes.COACH_KEYS) { CoachKeysScreen(onBack = { navController.popBackStack() }) }
                 composable(Routes.DEVICES) { DevicesScreen(onBack = { navController.popBackStack() }) }
                 composable(Routes.PRIVACY) { PrivacyZoneScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.VOICE) { VoiceSettingsScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.SETTINGS) {
+                    SettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                        onOpenDevices = { navController.navigate(Routes.DEVICES) },
+                        onOpenPrivacy = { navController.navigate(Routes.PRIVACY) },
+                        onOpenKeys = { navController.navigate(Routes.COACH_KEYS) },
+                        onOpenVoice = { navController.navigate(Routes.VOICE) },
+                        onOpenMaps = { navController.navigate(Routes.MAP_SETTINGS) },
+                        onOpenFuel = { navController.navigate(Routes.FUEL) },
+                        onOpenGarage = { navController.navigate(Routes.GARAGE) },
+                    )
+                }
+                composable(Routes.PROFILE) {
+                    ProfileScreen(onBack = { navController.popBackStack() }, onOpenGarage = { navController.navigate(Routes.GARAGE) })
+                }
+                composable(Routes.GARAGE) { GarageScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.MAP_SETTINGS) { MapSettingsScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.FUEL) {
+                    FuelScreen(onBack = { navController.popBackStack() }, onOpenKeys = { navController.navigate(Routes.COACH_KEYS) })
+                }
+                composable(Routes.WEATHER) { WeatherScreen(onBack = { navController.popBackStack() }) }
             }
         }
     }

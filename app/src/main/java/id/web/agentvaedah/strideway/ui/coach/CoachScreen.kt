@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.AlertDialog
@@ -56,7 +57,7 @@ private val starters = listOf(
 )
 
 @Composable
-fun CoachScreen(onOpenKeys: () -> Unit, vm: CoachViewModel = hiltViewModel()) {
+fun CoachScreen(onOpenKeys: () -> Unit, onBack: () -> Unit, vm: CoachViewModel = hiltViewModel()) {
     val messages by vm.messages.collectAsStateWithLifecycle()
     val cfg by vm.llmSettings.collectAsStateWithLifecycle()
     val hasKey by vm.hasKey.collectAsStateWithLifecycle()
@@ -72,7 +73,8 @@ fun CoachScreen(onOpenKeys: () -> Unit, vm: CoachViewModel = hiltViewModel()) {
     }
 
     Column(Modifier.fillMaxSize().imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Kembali ke Latihan") }
             Column(Modifier.weight(1f)) {
                 Text("AI Coach", style = MaterialTheme.typography.headlineLarge)
                 Text("${cfg.provider.label} · ${cfg.model}", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)

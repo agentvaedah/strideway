@@ -1,7 +1,6 @@
 package id.web.agentvaedah.strideway.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,67 +19,69 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import id.web.agentvaedah.strideway.core.challenge.ChallengeProgress
+import id.web.agentvaedah.strideway.core.challenge.Award
 import id.web.agentvaedah.strideway.core.format.Format
-import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.core.physio.TrainingLoad
+import id.web.agentvaedah.strideway.ui.components.ActivityRow
+import id.web.agentvaedah.strideway.ui.components.BentoCell
+import id.web.agentvaedah.strideway.ui.components.BentoGrid
 import id.web.agentvaedah.strideway.ui.components.EmptyState
 import id.web.agentvaedah.strideway.ui.components.ErrorState
 import id.web.agentvaedah.strideway.ui.components.LineChart
 import id.web.agentvaedah.strideway.ui.components.LoadingState
 import id.web.agentvaedah.strideway.ui.components.SectionTitle
 import id.web.agentvaedah.strideway.ui.components.Series
-import id.web.agentvaedah.strideway.ui.components.StatPair
-import id.web.agentvaedah.strideway.ui.components.TrackThumbnail
 import id.web.agentvaedah.strideway.ui.theme.MetricText
 import id.web.agentvaedah.strideway.ui.theme.Palette
 import java.time.DayOfWeek
-import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
 private val idLocale = Locale.forLanguageTag("id-ID")
-private val dateFmt = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm", idLocale)
 private val monthFmt = DateTimeFormatter.ofPattern("MMMM yyyy", idLocale)
-private val weekFmt = DateTimeFormatter.ofPattern("d MMM", idLocale)
 
 @Composable
 fun HomeScreen(
     onOpenActivity: (Long) -> Unit,
     onStartRecording: () -> Unit,
     onImport: () -> Unit,
+    onOpenGarage: () -> Unit,
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    (state as? HomeState.Ready)?.newAwards?.takeIf { it.isNotEmpty() }?.let { awards ->
+        AwardDialog(awards, onDismiss = { vm.acknowledgeAwards(awards) })
+    }
     when (val s = state) {
         HomeState.Loading -> LoadingState("Memuat aktivitas", Modifier.fillMaxSize())
         is HomeState.Error -> ErrorState(s.message, Modifier.fillMaxSize())
         is HomeState.Ready -> LazyColumn(Modifier.fillMaxSize()) {
             item { Text("Strideway", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(16.dp)) }
             item { FormCard(s.fitness, s.anyEstimatedLoad, hasActivities = s.feed.isNotEmpty()) }
+            item { InsightsCarousel(s, vm, onOpenGarage) }
             item { SectionTitle("Tantangan bulan ini") }
-            items(s.challenges, key = { it.id.name }) { ChallengeRow(it) }
-            item { CalendarSection(s.calendar, vm::previousMonth, vm::nextMonth) }
+            items(s.challenges, key = { it.progress.id.name }) { ChallengeRow(it, onJoin = { j -> vm.setJoined(it.progress.id, j) }) }
             item { SectionTitle("Aktivitas") }
             if (s.feed.isEmpty()) {
                 item {
@@ -94,7 +95,7 @@ fun HomeScreen(
                     )
                 }
             }
-            items(s.feed, key = { it.activity.id }) { FeedRow(it) { onOpenActivity(it.activity.id) } }
+            items(s.feed, key = { it.activity.id }) { ActivityRow(it.activity, it.path, onClick = { onOpenActivity(it.activity.id) }) }
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
@@ -103,50 +104,53 @@ fun HomeScreen(
 @Composable
 private fun FormCard(points: List<TrainingLoad.FitnessPoint>, estimated: Boolean, hasActivities: Boolean) {
     val today = points.lastOrNull()
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .background(Palette.Surface, MaterialTheme.shapes.large)
-            .padding(16.dp),
-    ) {
-        Text("Form hari ini", style = MetricText.Label, color = Palette.TextMuted)
-        val form = today?.form?.roundToInt() ?: 0
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text((if (form > 0) "+" else "") + form, style = MetricText.Huge, color = Palette.Text)
-            Spacer(Modifier.width(12.dp))
-            Text(formAdvice(today), style = MaterialTheme.typography.bodyMedium, color = Palette.TextMuted, modifier = Modifier.padding(bottom = 10.dp))
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            LegendValue("Fitness", today?.fitness?.roundToInt() ?: 0, Palette.Info)
-            LegendValue("Fatigue", today?.fatigue?.roundToInt() ?: 0, Palette.Accent)
-        }
-        Spacer(Modifier.height(12.dp))
-        if (hasActivities) {
-            LineChart(
-                series = listOf(
-                    Series(points.map { it.fitness.toFloat() }, Palette.Info),
-                    Series(points.map { it.fatigue.toFloat() }, Palette.Accent),
-                    Series(points.map { it.form.toFloat() }, Palette.Text, dashed = true),
-                ),
-                description = "Fitness, fatigue, dan form 42 hari terakhir",
-                height = 110.dp,
-                zeroLine = true,
-            )
-            Text("42 hari terakhir. Garis putus-putus: form.", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
-        } else {
-            Text("Grafik muncul setelah aktivitas pertama tersimpan.", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
-        }
-        if (estimated) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Sebagian aktivitas tanpa sensor detak jantung; bebannya diperkirakan dari durasi.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Palette.TextMuted,
-            )
-        }
-    }
+    val form = today?.form?.roundToInt() ?: 0
+    // Form decides today's session, so it alone spans the grid; fitness and fatigue explain it below.
+    BentoGrid(
+        listOf(
+            BentoCell(span = 2) {
+                Text("Form hari ini", style = MetricText.Label, color = Palette.TextMuted)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text((if (form > 0) "+" else "") + form, style = MetricText.Huge, color = Palette.Text)
+                    Spacer(Modifier.width(12.dp))
+                    Text(formAdvice(today), style = MaterialTheme.typography.bodyMedium, color = Palette.TextMuted, modifier = Modifier.padding(bottom = 10.dp))
+                }
+                Spacer(Modifier.height(8.dp))
+                if (hasActivities) {
+                    LineChart(
+                        series = listOf(
+                            Series(points.map { it.fitness.toFloat() }, Palette.Info),
+                            Series(points.map { it.fatigue.toFloat() }, Palette.Accent),
+                            Series(points.map { it.form.toFloat() }, Palette.Text, dashed = true),
+                        ),
+                        description = "Fitness, fatigue, dan form 42 hari terakhir",
+                        height = 110.dp,
+                        zeroLine = true,
+                    )
+                    Text("42 hari terakhir. Garis putus-putus: form.", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+                } else {
+                    Text("Grafik muncul setelah aktivitas pertama tersimpan.", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+                }
+                if (estimated) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Sebagian aktivitas tanpa sensor detak jantung; bebannya diperkirakan dari durasi.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Palette.TextMuted,
+                    )
+                }
+            },
+            BentoCell {
+                LegendValue("Fitness", today?.fitness?.roundToInt() ?: 0, Palette.Info)
+                Text("Kebugaran jangka panjang (42 hari)", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+            },
+            BentoCell {
+                LegendValue("Fatigue", today?.fatigue?.roundToInt() ?: 0, Palette.Accent)
+                Text("Kelelahan 7 hari terakhir", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+            },
+        ),
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
 }
 
 private fun formAdvice(p: TrainingLoad.FitnessPoint?): String {
@@ -169,44 +173,75 @@ private fun LegendValue(label: String, value: Int, color: Color) {
     }
 }
 
+/**
+ * Challenges are opt-in: an unjoined one shows its rule and a Join button, a joined one shows progress,
+ * and a completed one shows the award it earned.
+ */
 @Composable
-private fun ChallengeRow(p: ChallengeProgress) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+private fun ChallengeRow(c: ChallengeCard, onJoin: (Boolean) -> Unit) {
+    val p = c.progress
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(p.id.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            if (p.completed) {
-                Text(
-                    "Lencana diraih",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Palette.OnAccent,
-                    modifier = Modifier
-                        .background(Palette.Accent, MaterialTheme.shapes.extraSmall)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            } else {
-                Text(
-                    "${Format.oneDecimal(p.currentKm)} / ${p.targetKm.toInt()} km",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Palette.TextMuted,
-                )
+            Column(Modifier.weight(1f)) {
+                Text(p.id.title, style = MaterialTheme.typography.titleSmall)
+                Text(p.id.rule, style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+            }
+            when {
+                c.earned || (c.joined && p.completed) -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.EmojiEvents, contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Tercapai", style = MaterialTheme.typography.labelLarge, color = Palette.Accent)
+                }
+                c.joined -> TextButton(onClick = { onJoin(false) }) { Text("Keluar", color = Palette.TextMuted) }
+                else -> OutlinedButton(onClick = { onJoin(true) }) { Text("Ikuti") }
             }
         }
-        Spacer(Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { p.fraction.toFloat() },
-            modifier = Modifier.fillMaxWidth().height(6.dp),
-            color = if (p.completed) Palette.Accent else Palette.Info,
-            trackColor = Palette.SurfaceHigh,
-            drawStopIndicator = {},
-        )
-        Text(p.id.rule, style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+        if (c.joined) {
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { p.fraction.toFloat() },
+                modifier = Modifier.fillMaxWidth().height(6.dp),
+                color = Palette.Accent,
+                trackColor = Palette.SurfaceHigh,
+                drawStopIndicator = {},
+            )
+            Text(
+                "${Format.oneDecimal(p.currentKm)} / ${p.targetKm.toInt()} km",
+                style = MaterialTheme.typography.labelMedium,
+                color = Palette.TextMuted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 
 @Composable
-private fun CalendarSection(cal: CalendarData, onPrev: () -> Unit, onNext: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun AwardDialog(awards: List<Award>, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.EmojiEvents, contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(40.dp)) },
+        title = { Text(if (awards.size == 1) "Tantangan tercapai" else "${awards.size} tantangan tercapai") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                awards.forEach { a ->
+                    val month = a.month.format(monthFmt).replaceFirstChar { it.titlecase(idLocale) }
+                    Text("${a.id.title} · $month", style = MaterialTheme.typography.bodyLarge)
+                }
+                Text(
+                    "Penghargaan tersimpan di You > Progress.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.TextMuted,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Mantap") } },
+    )
+}
+
+@Composable
+internal fun CalendarSection(cal: CalendarData, onPrev: () -> Unit, onNext: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrev) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = "Bulan sebelumnya") }
             Text(
                 cal.month.format(monthFmt).replaceFirstChar { it.titlecase(idLocale) },
@@ -216,7 +251,7 @@ private fun CalendarSection(cal: CalendarData, onPrev: () -> Unit, onNext: () ->
             )
             IconButton(onClick = onNext) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = "Bulan berikutnya") }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Row(Modifier.fillMaxWidth()) {
             listOf("Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min").forEach {
                 Text(it, style = MaterialTheme.typography.labelMedium, color = Palette.TextMuted, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             }
@@ -227,7 +262,7 @@ private fun CalendarSection(cal: CalendarData, onPrev: () -> Unit, onNext: () ->
         val cells = lead + days
         val rows = (cells + 6) / 7
         for (r in 0 until rows) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Row(Modifier.fillMaxWidth()) {
                 for (c in 0 until 7) {
                     val day = r * 7 + c - lead + 1
                     Box(Modifier.weight(1f).aspectRatio(1.4f), contentAlignment = Alignment.Center) {
@@ -236,7 +271,7 @@ private fun CalendarSection(cal: CalendarData, onPrev: () -> Unit, onNext: () ->
                             Box(
                                 Modifier
                                     .size(30.dp)
-                                    .background(if (active) Palette.Accent else Palette.Bg, CircleShape)
+                                    .background(if (active) Palette.Accent else Palette.Surface, CircleShape)
                                     .semantics { contentDescription = if (active) "Tanggal $day, ada latihan" else "Tanggal $day" },
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -251,51 +286,5 @@ private fun CalendarSection(cal: CalendarData, onPrev: () -> Unit, onNext: () ->
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text("Jam latihan per minggu", style = MaterialTheme.typography.labelLarge, color = Palette.TextMuted, modifier = Modifier.padding(horizontal = 16.dp))
-        val maxHours = cal.weeklyHours.maxOfOrNull { it.second }?.coerceAtLeast(1.0) ?: 1.0
-        cal.weeklyHours.forEach { (start, hours) ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(start.format(weekFmt), style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted, modifier = Modifier.width(56.dp))
-                Box(Modifier.weight(1f).height(8.dp).background(Palette.SurfaceHigh, MaterialTheme.shapes.extraSmall)) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth((hours / maxHours).toFloat().coerceIn(0f, 1f))
-                            .height(8.dp)
-                            .background(Palette.Info, MaterialTheme.shapes.extraSmall),
-                    )
-                }
-                Text(Format.duration((hours * 3_600_000).toLong()), style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(64.dp), textAlign = TextAlign.End)
-            }
-        }
     }
-}
-
-@Composable
-private fun FeedRow(item: FeedItem, onClick: () -> Unit) {
-    val a = item.activity
-    val date = Instant.ofEpochMilli(a.startMs).atZone(ZoneId.systemDefault()).format(dateFmt)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Text(a.name, style = MaterialTheme.typography.titleMedium)
-        Text(
-            "${if (a.sport == Sport.RIDE) "Ride" else "Run"} · $date",
-            style = MaterialTheme.typography.bodySmall,
-            color = Palette.TextMuted,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            StatPair("km", Format.km(a.distanceM))
-            StatPair("waktu", Format.duration(a.movingMs))
-            StatPair("naik m", Format.integer(a.elevationGainM))
-            StatPair("kkal", Format.integer(a.calories))
-        }
-        Spacer(Modifier.height(8.dp))
-        TrackThumbnail(item.path, Modifier.fillMaxWidth().height(120.dp))
-    }
-    HorizontalDivider(color = Palette.Outline)
 }

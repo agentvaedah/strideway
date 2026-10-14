@@ -41,6 +41,7 @@ import id.web.agentvaedah.strideway.data.ble.ScannedDevice
 import id.web.agentvaedah.strideway.data.ble.SensorStatus
 import id.web.agentvaedah.strideway.data.db.SensorDao
 import id.web.agentvaedah.strideway.data.db.SensorEntity
+import id.web.agentvaedah.strideway.data.location.MotionSensors
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.ui.components.BackTopBar
 import id.web.agentvaedah.strideway.ui.components.EmptyState
@@ -58,7 +59,9 @@ class DevicesViewModel @Inject constructor(
     private val ble: BleHub,
     sensorDao: SensorDao,
     private val settings: SettingsRepository,
+    motion: MotionSensors,
 ) : ViewModel() {
+    val phone = PhoneSensors(motion.hasCompass, motion.hasBarometer, motion.hasThermometer)
     val saved: StateFlow<List<SensorEntity>> = sensorDao.observeAll().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val status: StateFlow<Map<String, SensorStatus>> = ble.status
     val scanResults: StateFlow<List<ScannedDevice>> = ble.scanResults
@@ -114,13 +117,16 @@ fun DevicesScreen(onBack: () -> Unit, vm: DevicesViewModel = hiltViewModel()) {
         LazyColumn(Modifier.fillMaxSize()) {
             item {
                 Text(
-                    "Mendukung sensor detak jantung, speed/cadence, dan power meter standar Bluetooth. " +
-                        "Huawei Band 11 Pro dan jam Garmin terbaca setelah mode siaran detak jantung (HR broadcast) dinyalakan di jamnya.",
+                    "Mendukung sensor Bluetooth standar: detak jantung, speed/cadence, power meter, serta suhu dan tekanan " +
+                        "(Environmental Sensing). Untuk jam tangan atau smartband, aktifkan siaran detak jantung (HR broadcast) " +
+                        "di perangkat agar terdeteksi. Barometer, altimeter, dan kompas jam tidak dikirim lewat Bluetooth standar, " +
+                        "jadi Strideway memakai sensor ponsel.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Palette.TextMuted,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
+            item { PhoneSensorsSection(vm.phone) }
             item { SectionTitle("Tersimpan") }
             if (saved.isEmpty()) {
                 item { Text("Belum ada sensor tersimpan.", color = Palette.TextMuted, modifier = Modifier.padding(horizontal = 16.dp)) }
@@ -217,5 +223,38 @@ private fun WheelSetting(currentM: Double, onSave: (Int) -> Unit) {
             }
         }
         Text(String.format(Locale.US, "Tersimpan: %.3f m", currentM), style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+    }
+}
+
+data class PhoneSensors(val compass: Boolean, val barometer: Boolean, val thermometer: Boolean)
+
+/** What this phone can measure on its own, so the rider knows where altitude, heading and temperature come from. */
+@Composable
+private fun PhoneSensorsSection(p: PhoneSensors) {
+    SectionTitle("Sensor ponsel")
+    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        CapabilityRow("Kompas", p.compass, if (p.compass) "Arah di peta dan saat merekam" else "Arah diambil dari GPS saat bergerak")
+        CapabilityRow("Barometer", p.barometer, if (p.barometer) "Tekanan udara dan elevasi yang halus" else "Elevasi memakai GPS")
+        CapabilityRow("Altimeter", p.barometer, if (p.barometer) "Dari barometer, dikalibrasi dengan GPS" else "Dari GPS, kurang halus di tanjakan")
+        CapabilityRow(
+            "Suhu",
+            p.thermometer,
+            if (p.thermometer) "Sensor suhu ponsel" else "Dari data cuaca, atau sensor Bluetooth suhu bila tersambung",
+        )
+    }
+}
+
+@Composable
+private fun CapabilityRow(name: String, available: Boolean, detail: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyLarge)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+        }
+        Text(
+            if (available) "Ada" else "Tidak ada",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (available) Palette.Success else Palette.TextMuted,
+        )
     }
 }

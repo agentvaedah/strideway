@@ -6,4 +6,11 @@
         <item name="android:statusBarColor">@color/bg</item>
         <item name="android:navigationBarColor">@color/bg</item>
     </style>
+
+    <!-- Launch window: one dot on the app background. MainActivity's Compose splash continues from it. -->
+    <style name="Theme.Strideway.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_dot</item>
+        <item name="postSplashScreenTheme">@style/Theme.Strideway</item>
+    </style>
 </resources>

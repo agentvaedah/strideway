@@ -1,125 +1,177 @@
 package id.web.agentvaedah.strideway.ui.record
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import id.web.agentvaedah.strideway.core.model.LatLon
+import id.web.agentvaedah.strideway.core.route.NavState
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.service.GpsFix
 import id.web.agentvaedah.strideway.service.RecordingState
-import id.web.agentvaedah.strideway.ui.components.LineChart
+import id.web.agentvaedah.strideway.ui.components.MapCompass
 import id.web.agentvaedah.strideway.ui.components.MapHost
 import id.web.agentvaedah.strideway.ui.components.MapLayers
-import id.web.agentvaedah.strideway.ui.components.Series
 import id.web.agentvaedah.strideway.ui.components.toLatLng
 import id.web.agentvaedah.strideway.ui.theme.Palette
+import id.web.agentvaedah.strideway.ui.weather.WeatherBadge
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
+import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
+import kotlin.math.roundToInt
 
+/**
+ * Full-screen live map behind the metrics sheet. [bottomInset] is the height the sheet covers, so the
+ * rider's arrow sits in the visible part of the map rather than under the sheet.
+ */
 @Composable
-fun LiveMap(state: RecordingState.Active, base: MapBase, navRoute: List<LatLon>, modifier: Modifier = Modifier) {
+fun LiveMap(
+    state: RecordingState.Active,
+    base: MapBase,
+    navRoute: List<LatLon>,
+    nav: NavState?,
+    camera: CameraMode,
+    tilt3d: Boolean,
+    headingUp: Boolean,
+    routeAlerts: Boolean,
+    bottomInset: Dp,
+    onCamera: (CameraMode) -> Unit,
+    onToggle3d: () -> Unit,
+    onToggleHeadingUp: () -> Unit,
+    onToggleAlerts: () -> Unit,
+    onSwitchRoute: () -> Unit,
+    weather: WeatherState,
+    onOpenWeather: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
-    var centered by remember { mutableStateOf(false) }
+    var mapBearing by remember { mutableFloatStateOf(0f) }
+    val onCameraLatest by rememberUpdatedState(onCamera)
 
     Box(modifier) {
         MapHost(
             base = base,
+            allowRotateTilt = true,
             modifier = Modifier.matchParentSize(),
             onMapReady = { map = it },
             onStyleLoaded = { _, st -> style = st },
         )
 
-        LaunchedEffect(style, navRoute) {
-            val st = style ?: return@LaunchedEffect
-            MapLayers.setLine(st, "nav-route", navRoute, Palette.Info, 5f)
+        DisposableEffect(map) {
+            val m = map ?: return@DisposableEffect onDispose { }
+            val started = MapLibreMap.OnCameraMoveStartedListener { reason ->
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) onCameraLatest(CameraMode.FREE)
+            }
+            val moved = MapLibreMap.OnCameraMoveListener { mapBearing = m.cameraPosition.bearing.toFloat() }
+            m.addOnCameraMoveStartedListener(started)
+            m.addOnCameraMoveListener(moved)
+            onDispose {
+                m.removeOnCameraMoveStartedListener(started)
+                m.removeOnCameraMoveListener(moved)
+            }
         }
-        LaunchedEffect(style, state.path.size, state.position) {
+
+        val routeColor = Palette.Info
+        val trackColor = Palette.Accent
+        LaunchedEffect(style, navRoute, routeColor) {
             val st = style ?: return@LaunchedEffect
-            MapLayers.setLine(st, "live-track", state.path, Palette.Accent, 5f)
-            MapLayers.setPoint(st, "live-position", state.position, Palette.Accent)
+            MapLayers.setLine(st, "nav-route", navRoute, routeColor, 5f, lineStyle = MapLayers.LineStyle.ROUTE)
+        }
+        LaunchedEffect(style, state.path.size, state.position, state.headingDeg, trackColor) {
+            val st = style ?: return@LaunchedEffect
+            MapLayers.setLine(st, "live-track", state.path, trackColor, 6f, lineStyle = MapLayers.LineStyle.TRACK)
+            MapLayers.setHeadingPuck(st, "live-position", state.position, state.headingDeg, trackColor)
+        }
+
+        val density = LocalDensity.current
+        val insetPx = with(density) { bottomInset.toPx() }.roundToInt()
+        LaunchedEffect(map, camera, tilt3d, headingUp, state.position, state.headingDeg, insetPx, navRoute) {
             val m = map ?: return@LaunchedEffect
-            val pos = state.position ?: return@LaunchedEffect
-            if (!centered) {
-                m.moveCamera(CameraUpdateFactory.newLatLngZoom(pos.toLatLng(), 16.0))
-                centered = true
-            } else {
-                m.animateCamera(CameraUpdateFactory.newLatLng(pos.toLatLng()), 400)
+            when (camera) {
+                CameraMode.FREE -> Unit
+                CameraMode.OVERVIEW -> {
+                    val pts = navRoute + state.path + listOfNotNull(state.position)
+                    if (pts.isEmpty()) return@LaunchedEffect
+                    val bounds = LatLngBounds.Builder().includes(pts.map { it.toLatLng() }).build()
+                    if (pts.distinct().size < 2) {
+                        m.animateCamera(CameraUpdateFactory.newLatLngZoom(pts.first().toLatLng(), 15.0), 600)
+                    } else {
+                        m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 0.0, 0.0, 120, 160, 120, insetPx + 60), 600)
+                    }
+                }
+                CameraMode.FOLLOW -> {
+                    val pos = state.position ?: return@LaunchedEffect
+                    // Bottom padding moves the focus point up into the visible map above the sheet.
+                    val target = CameraPosition.Builder()
+                        .padding(0.0, 0.0, 0.0, insetPx.toDouble())
+                        .target(pos.toLatLng())
+                        .zoom(if (tilt3d) 17.0 else maxOf(m.cameraPosition.zoom, 15.5).coerceAtMost(17.5))
+                        .tilt(if (tilt3d) 60.0 else 0.0)
+                        .bearing(if (headingUp) (state.headingDeg ?: m.cameraPosition.bearing.toFloat()).toDouble() else 0.0)
+                        .build()
+                    m.animateCamera(CameraUpdateFactory.newCameraPosition(target), 600)
+                }
             }
         }
 
-        Compass(state.headingDeg, Modifier.align(Alignment.TopEnd).padding(12.dp))
-        GpsBadge(state.gpsFix, Modifier.align(Alignment.TopStart).padding(12.dp))
-
-        if (state.elevationProfile.size >= 2) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .background(Palette.Bg.copy(alpha = 0.78f), MaterialTheme.shapes.small)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-            ) {
-                LineChart(
-                    series = listOf(Series(state.elevationProfile, Palette.TextMuted)),
-                    description = "Profil elevasi sejauh ini",
-                    height = 40.dp,
-                    fillFirst = true,
-                )
+        Column(
+            Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp, end = if (nav != null) 12.dp else 72.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // With a route the turn banner owns the top; the compass and buttons move below it.
+            nav?.let { NavBanner(it) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GpsBadge(state.gpsFix)
+                WeatherBadge(weather, onOpenWeather)
             }
+        }
+
+        Column(
+            Modifier.align(Alignment.TopEnd).padding(12.dp).padding(top = if (nav != null) 150.dp else 0.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            MapCompass(mapBearing, state.headingDeg, headingUp, onToggleHeadingUp)
+            MapControls(
+                tilt3d = tilt3d,
+                camera = camera,
+                hasRoute = navRoute.size >= 2,
+                routeAlerts = routeAlerts,
+                onToggle3d = onToggle3d,
+                onLocate = { onCamera(CameraMode.FOLLOW) },
+                onOverview = { onCamera(if (camera == CameraMode.OVERVIEW) CameraMode.FOLLOW else CameraMode.OVERVIEW) },
+                onSwitchRoute = onSwitchRoute,
+                onToggleAlerts = onToggleAlerts,
+            )
         }
     }
 }
 
 @Composable
-private fun Compass(heading: Float?, modifier: Modifier) {
-    val label = heading?.let { "Arah ${it.toInt()} derajat" } ?: "Arah belum diketahui"
-    Box(
-        modifier
-            .size(48.dp)
-            .background(Palette.Bg.copy(alpha = 0.85f), CircleShape)
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(30.dp).rotate(heading ?: 0f)) {
-            val w = size.width
-            val h = size.height
-            val north = Path().apply {
-                moveTo(w / 2, 0f); lineTo(w * 0.72f, h / 2); lineTo(w * 0.28f, h / 2); close()
-            }
-            val south = Path().apply {
-                moveTo(w / 2, h); lineTo(w * 0.72f, h / 2); lineTo(w * 0.28f, h / 2); close()
-            }
-            drawPath(north, if (heading != null) Palette.Accent else Palette.TextMuted)
-            drawPath(south, Palette.TextMuted)
-            drawCircle(Palette.Bg, radius = 2.dp.toPx(), center = Offset(w / 2, h / 2))
-        }
-    }
-}
-
-@Composable
-private fun GpsBadge(fix: GpsFix, modifier: Modifier) {
+private fun GpsBadge(fix: GpsFix) {
     val (text, color) = when (fix) {
         GpsFix.SEARCHING -> "Mencari GPS" to Palette.Warning
         GpsFix.OK -> "GPS" to Palette.Success
@@ -130,7 +182,7 @@ private fun GpsBadge(fix: GpsFix, modifier: Modifier) {
         text,
         style = MaterialTheme.typography.labelMedium,
         color = color,
-        modifier = modifier
+        modifier = Modifier
             .background(Palette.Bg.copy(alpha = 0.85f), MaterialTheme.shapes.small)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )

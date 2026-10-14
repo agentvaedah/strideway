@@ -19,8 +19,8 @@ sealed interface MotionSample {
     /** Device azimuth, 0 = north, clockwise. */
     data class Heading(val degrees: Float, val timeMs: Long) : MotionSample
 
-    /** Barometric altitude relative to standard atmosphere; needs a GPS offset to be absolute. */
-    data class Pressure(val altitudeM: Double, val timeMs: Long) : MotionSample
+    /** Barometric altitude relative to standard atmosphere (needs a GPS offset to be absolute) and raw pressure. */
+    data class Pressure(val altitudeM: Double, val hpa: Double, val timeMs: Long) : MotionSample
 }
 
 @Singleton
@@ -28,6 +28,8 @@ class MotionSensors @Inject constructor(@ApplicationContext context: Context) {
     private val manager = context.getSystemService(SensorManager::class.java)
 
     val hasBarometer: Boolean get() = manager?.getDefaultSensor(Sensor.TYPE_PRESSURE) != null
+    val hasCompass: Boolean get() = manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) != null
+    val hasThermometer: Boolean get() = manager?.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE) != null
 
     fun samples(): Flow<MotionSample> = callbackFlow {
         val sm = manager
@@ -41,6 +43,7 @@ class MotionSensors @Inject constructor(@ApplicationContext context: Context) {
         var lastHeadingMs = 0L
         var lastPressureMs = 0L
         var smoothedAltitude: Double? = null
+        var smoothedHpa: Double? = null
 
         val listener = object : SensorEventListener {
             override fun onSensorChanged(e: SensorEvent) {
@@ -65,9 +68,11 @@ class MotionSensors @Inject constructor(@ApplicationContext context: Context) {
                     Sensor.TYPE_PRESSURE -> {
                         val alt = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, e.values[0]).toDouble()
                         smoothedAltitude = smoothedAltitude?.let { it + (alt - it) * 0.2 } ?: alt
+                        val hpa = e.values[0].toDouble()
+                        smoothedHpa = smoothedHpa?.let { it + (hpa - it) * 0.2 } ?: hpa
                         if (now - lastPressureMs >= PRESSURE_PERIOD_MS) {
                             lastPressureMs = now
-                            trySend(MotionSample.Pressure(smoothedAltitude!!, now))
+                            trySend(MotionSample.Pressure(smoothedAltitude!!, smoothedHpa!!, now))
                         }
                     }
                 }

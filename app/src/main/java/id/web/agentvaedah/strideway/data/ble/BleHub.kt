@@ -59,6 +59,9 @@ sealed interface SensorReading {
     data class Cadence(val rpm: Int, override val timeMs: Long) : SensorReading
     data class WheelSpeed(val mps: Double, override val timeMs: Long) : SensorReading
     data class Power(val watts: Int, override val timeMs: Long) : SensorReading
+    data class Temperature(val celsius: Double, override val timeMs: Long) : SensorReading
+    data class Pressure(val hpa: Double, override val timeMs: Long) : SensorReading
+    data class Humidity(val percent: Double, override val timeMs: Long) : SensorReading
 }
 
 data class ScannedDevice(val address: String, val name: String, val kind: SensorKind, val rssi: Int)
@@ -72,14 +75,19 @@ private object Gatt {
     val CSC_MEASUREMENT = uuid16(0x2A5B)
     val POWER_SERVICE = uuid16(0x1818)
     val POWER_MEASUREMENT = uuid16(0x2A63)
+    val ENV_SERVICE = uuid16(0x181A)
+    val ENV_TEMPERATURE = uuid16(0x2A6E)
+    val ENV_PRESSURE = uuid16(0x2A6D)
+    val ENV_HUMIDITY = uuid16(0x2A6F)
     val BATTERY_SERVICE = uuid16(0x180F)
     val BATTERY_LEVEL = uuid16(0x2A19)
     val CCCD = uuid16(0x2902)
 }
 
 /**
- * Standard BLE fitness sensors: heart rate (0x180D), speed/cadence (0x1816) and cycling power (0x1818).
- * Huawei Band and Garmin watches show up here only with their "HR broadcast" mode switched on.
+ * Standard BLE fitness sensors: heart rate (0x180D), speed/cadence (0x1816), cycling power (0x1818) and
+ * Environmental Sensing (0x181A) for temperature, pressure and humidity.
+ * Watches and smartbands show up here only with their "HR broadcast" mode switched on.
  */
 @Singleton
 class BleHub @Inject constructor(
@@ -134,6 +142,7 @@ class BleHub @Inject constructor(
                 Gatt.HR_SERVICE in uuids -> SensorKind.HR
                 Gatt.POWER_SERVICE in uuids -> SensorKind.POWER
                 Gatt.CSC_SERVICE in uuids -> SensorKind.CSC
+                Gatt.ENV_SERVICE in uuids -> SensorKind.ENV
                 else -> return
             }
             val name = result.scanRecord?.deviceName ?: result.device.name ?: "Sensor ${result.device.address.takeLast(5)}"
@@ -151,7 +160,7 @@ class BleHub @Inject constructor(
         val scanner = adapter?.bluetoothLeScanner ?: return
         if (!hasPermissions() || _scanning.value) return
         _scanResults.value = emptyList()
-        val filters = listOf(Gatt.HR_SERVICE, Gatt.CSC_SERVICE, Gatt.POWER_SERVICE).map {
+        val filters = listOf(Gatt.HR_SERVICE, Gatt.CSC_SERVICE, Gatt.POWER_SERVICE, Gatt.ENV_SERVICE).map {
             ScanFilter.Builder().setServiceUuid(ParcelUuid(it)).build()
         }
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
@@ -283,6 +292,9 @@ class BleHub @Inject constructor(
                         wheel.update(csc.wheelRevs!!, csc.wheelEventTime!!, now)?.let { _readings.tryEmit(SensorReading.WheelSpeed(it, now)) }
                     }
                 }
+                Gatt.ENV_TEMPERATURE -> GattParsers.temperatureC(value)?.let { _readings.tryEmit(SensorReading.Temperature(it, now)) }
+                Gatt.ENV_PRESSURE -> GattParsers.pressureHpa(value)?.let { _readings.tryEmit(SensorReading.Pressure(it, now)) }
+                Gatt.ENV_HUMIDITY -> GattParsers.humidityPct(value)?.let { _readings.tryEmit(SensorReading.Humidity(it, now)) }
                 Gatt.BATTERY_LEVEL -> GattParsers.battery(value)?.let { pct -> setStatus(address) { it?.copy(batteryPct = pct) ?: SensorStatus(address, name, kind, connected = true, connecting = false, batteryPct = pct) } }
             }
         }
@@ -310,6 +322,9 @@ class BleHub @Inject constructor(
                     Gatt.HR_SERVICE to Gatt.HR_MEASUREMENT,
                     Gatt.CSC_SERVICE to Gatt.CSC_MEASUREMENT,
                     Gatt.POWER_SERVICE to Gatt.POWER_MEASUREMENT,
+                    Gatt.ENV_SERVICE to Gatt.ENV_TEMPERATURE,
+                    Gatt.ENV_SERVICE to Gatt.ENV_PRESSURE,
+                    Gatt.ENV_SERVICE to Gatt.ENV_HUMIDITY,
                 ).forEach { (service, char) ->
                     g.getService(service)?.getCharacteristic(char)?.let { ch -> pending.addLast { enableNotify(it, ch) } }
                 }

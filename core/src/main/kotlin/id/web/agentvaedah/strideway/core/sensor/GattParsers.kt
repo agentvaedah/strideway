@@ -52,6 +52,19 @@ object GattParsers {
         return if (raw >= 0x8000) raw - 0x10000 else raw
     }
 
+    /** Environmental Sensing Temperature 0x2A6E: sint16 in 0.01 °C. */
+    fun temperatureC(v: ByteArray): Double? {
+        if (v.size < 2) return null
+        val raw = v.u16(0)
+        return (if (raw >= 0x8000) raw - 0x10000 else raw) / 100.0
+    }
+
+    /** Environmental Sensing Pressure 0x2A6D: uint32 in 0.1 Pa, returned in hPa. */
+    fun pressureHpa(v: ByteArray): Double? = if (v.size < 4) null else v.u32(0) / 1000.0
+
+    /** Environmental Sensing Humidity 0x2A6F: uint16 in 0.01 %. */
+    fun humidityPct(v: ByteArray): Double? = if (v.size < 2) null else v.u16(0) / 100.0
+
     private fun ByteArray.u8(i: Int): Int = this[i].toInt() and 0xFF
     private fun ByteArray.u16(i: Int): Int = u8(i) or (u8(i + 1) shl 8)
     private fun ByteArray.u32(i: Int): Long = (u16(i).toLong()) or (u16(i + 2).toLong() shl 16)

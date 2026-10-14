@@ -81,3 +81,28 @@ class CadenceCalculatorTest {
         assertEquals(10.525, w.update(105, 1024, 1000)!!, 1e-9)
     }
 }
+
+class EnvironmentalParsersTest {
+    private fun bytes(vararg v: Int) = ByteArray(v.size) { v[it].toByte() }
+
+    @Test
+    fun temperatureIsSint16HundredthsOfDegree() {
+        // 0x0A1D = 2589 -> 25.89 °C
+        assertEquals(25.89, GattParsers.temperatureC(bytes(0x1D, 0x0A))!!, 1e-9)
+        // -5.00 °C = -500 = 0xFE0C
+        assertEquals(-5.0, GattParsers.temperatureC(bytes(0x0C, 0xFE))!!, 1e-9)
+        assertNull(GattParsers.temperatureC(bytes(0x01)))
+    }
+
+    @Test
+    fun pressureIsUint32TenthsOfPascal() {
+        // 1013250 (0x000F7602) tenths of Pa -> 1013.25 hPa
+        assertEquals(1013.25, GattParsers.pressureHpa(bytes(0x02, 0x76, 0x0F, 0x00))!!, 1e-9)
+        assertNull(GattParsers.pressureHpa(bytes(0x00, 0x01)))
+    }
+
+    @Test
+    fun humidityIsUint16HundredthsOfPercent() {
+        assertEquals(65.5, GattParsers.humidityPct(bytes(0x96, 0x19))!!, 1e-9)
+    }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "strideway-motion-splash",
+  "private": true,
+  "type": "module",
+  "description": "Renders the 15 second Strideway splash video (Skia canvas frames piped into ffmpeg).",
+  "scripts": {
+    "render": "node render.mjs",
+    "stills": "node render.mjs --stills 0.4,1.2,2.6,4.8,6.5,9.8,11.6,12.5,13.3,13.9,14.9"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "1.0.11"
+  }
+}

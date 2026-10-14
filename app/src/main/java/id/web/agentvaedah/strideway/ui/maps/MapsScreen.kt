@@ -3,11 +3,22 @@ package id.web.agentvaedah.strideway.ui.maps
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Draw
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.ViewInAr
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.vector.ImageVector
+import id.web.agentvaedah.strideway.core.geo.Geo
+import id.web.agentvaedah.strideway.data.prefs.MapOverlay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +34,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -43,6 +53,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,10 +63,14 @@ import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.data.db.RouteSource
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.data.prefs.TerrainOverlay
+import id.web.agentvaedah.strideway.ui.components.LocalMapboxToken
+import id.web.agentvaedah.strideway.ui.components.MapCompass
 import id.web.agentvaedah.strideway.ui.components.MapHost
+import id.web.agentvaedah.strideway.ui.components.MapStyles
 import id.web.agentvaedah.strideway.ui.components.MapLayers
 import id.web.agentvaedah.strideway.ui.components.toLatLng
 import id.web.agentvaedah.strideway.ui.theme.Palette
+import id.web.agentvaedah.strideway.ui.weather.WeatherBadge
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
@@ -67,8 +83,30 @@ fun MapsScreen(
     onNavigateRoute: () -> Unit,
     onOpenActivity: (Long) -> Unit,
     onOpenKeys: () -> Unit,
+    onOpenWeather: () -> Unit,
     vm: MapsViewModel = hiltViewModel(),
+    planner: MapPlannerViewModel = hiltViewModel(),
 ) {
+    val sport by planner.sport.collectAsStateWithLifecycle()
+    val overlays by planner.overlays.collectAsStateWithLifecycle()
+    val tilt3d by planner.tilt3d.collectAsStateWithLifecycle()
+    val search by planner.search.collectAsStateWithLifecycle()
+    val focus by planner.focus.collectAsStateWithLifecycle()
+    val from by planner.from.collectAsStateWithLifecycle()
+    val to by planner.to.collectAsStateWithLifecycle()
+    val plan by planner.plan.collectAsStateWithLifecycle()
+    val sort by planner.sort.collectAsStateWithLifecycle()
+    val selected by planner.selected.collectAsStateWithLifecycle()
+    val places by planner.savedPlaces.collectAsStateWithLifecycle()
+    val drawing by planner.drawing.collectAsStateWithLifecycle()
+    val draw by planner.draw.collectAsStateWithLifecycle()
+    val drawBusy by planner.drawBusy.collectAsStateWithLifecycle()
+    val heat by planner.heat.collectAsStateWithLifecycle()
+    val plannerMessage by planner.message.collectAsStateWithLifecycle()
+    val drawingNow by rememberUpdatedState(drawing)
+    val weather by vm.weather.collectAsStateWithLifecycle()
+    val heading by vm.heading.collectAsStateWithLifecycle()
+
     val base by vm.mapBase.collectAsStateWithLifecycle()
     val overlay by vm.overlay.collectAsStateWithLifecycle()
     val draft by vm.draft.collectAsStateWithLifecycle()
@@ -80,6 +118,8 @@ fun MapsScreen(
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
     var sheet by rememberSaveable { mutableStateOf(Sheet.NONE) }
+    var planOpen by rememberSaveable { mutableStateOf(false) }
+    var planExpanded by rememberSaveable { mutableStateOf(true) }
     var exportId by remember { mutableLongStateOf(-1L) }
     val snackbar = remember { SnackbarHostState() }
 
@@ -94,8 +134,19 @@ fun MapsScreen(
             vm.clearMessage()
         }
     }
+    LaunchedEffect(plannerMessage) {
+        plannerMessage?.let {
+            snackbar.showSnackbar(it)
+            planner.clearMessage()
+        }
+    }
 
-    val linePoints: List<LatLon> = draft?.points?.map { it.latLon } ?: shown?.second.orEmpty()
+    val plannedPreview = (plan as? PlanState.Ready)?.let { planner.sorted(it.options).getOrNull(selected) }?.points?.map { it.latLon }
+    val linePoints: List<LatLon> = when {
+        drawing -> draw.path()
+        plannedPreview != null -> plannedPreview
+        else -> draft?.points?.map { it.latLon } ?: shown?.second.orEmpty()
+    }
 
     Box(Modifier.fillMaxSize()) {
         MapHost(
@@ -107,6 +158,14 @@ fun MapsScreen(
                 m.addOnCameraIdleListener {
                     val c = m.cameraPosition
                     c.target?.let { t -> vm.onCameraIdle(t.latitude, t.longitude, c.zoom) }
+                }
+                m.addOnMapClickListener { ll ->
+                    if (drawingNow) {
+                        planner.addPoint(LatLon(ll.latitude, ll.longitude))
+                        true
+                    } else {
+                        false
+                    }
                 }
             },
             onStyleLoaded = { m, st ->
@@ -120,24 +179,138 @@ fun MapsScreen(
             val img = (terrain as? TerrainState.Shown)?.image
             MapLayers.setImage(st, "terrain", img?.quad, img?.bitmap, if (overlay == TerrainOverlay.HILLSHADE) 0.8f else 0.55f, below = "route-casing")
         }
-        LaunchedEffect(style, linePoints) {
+        val routeColor = Palette.Accent
+        val density = LocalDensity.current
+        val screenH = LocalConfiguration.current.screenHeightDp
+        // The collapsed planner covers about a tenth of the screen; frame the route above it.
+        val bottomInsetPx = if (planOpen) with(density) { (screenH * 0.14f).dp.roundToPx() } else 0
+        LaunchedEffect(style, linePoints, routeColor, bottomInsetPx) {
             val st = style ?: return@LaunchedEffect
-            MapLayers.setLine(st, "route", linePoints, Palette.Accent, 4f)
-            if (linePoints.size >= 2) map?.let { MapLayers.fit(it, linePoints) }
+            MapLayers.setLine(st, "route", linePoints, routeColor, 5f, lineStyle = MapLayers.LineStyle.ROUTE)
+            // While drawing the camera stays where the rider is working; fitting each tap would jump around.
+            if (linePoints.size >= 2 && !drawing) map?.let { MapLayers.fit(it, linePoints, bottomPx = bottomInsetPx) }
+        }
+        val pinColor = Palette.Info
+        LaunchedEffect(style, focus) {
+            val st = style ?: return@LaunchedEffect
+            MapLayers.setPoint(st, "focus-pin", focus?.pos, pinColor, 8f)
+            focus?.let { f -> map?.animateCamera(CameraUpdateFactory.newLatLngZoom(f.pos.toLatLng(), 14.0)) }
+        }
+        LaunchedEffect(style, overlays, base) {
+            val st = style ?: return@LaunchedEffect
+            MapLayers.setRasterOverlay(st, "bike-lanes", if (MapOverlay.BIKE_LANES in overlays) MapStyles.BIKE_LANES_URL else null, below = "route-casing")
+            if (base == MapBase.STANDARD) MapLayers.setPoiVisible(st, MapOverlay.POI in overlays)
+        }
+        val heatColor = Palette.Accent
+        LaunchedEffect(style, heat, overlays) {
+            val st = style ?: return@LaunchedEffect
+            MapLayers.setHeatmap(st, "heatmap", if (MapOverlay.HEATMAP in overlays) heat else emptyList(), heatColor)
+        }
+        LaunchedEffect(map, tilt3d) {
+            map?.animateCamera(CameraUpdateFactory.tiltTo(if (tilt3d) 60.0 else 0.0), 500)
         }
 
-        TopControls(
-            onLayers = { sheet = Sheet.LAYERS },
-            onRoutes = { sheet = Sheet.ROUTES },
-            onImport = { importLauncher.launch(arrayOf("*/*")) },
-            onAi = { sheet = Sheet.AI },
-            modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
-        )
-        TerrainBanner(terrain, overlay, Modifier.align(Alignment.TopCenter).padding(top = 64.dp))
+        Column(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(12.dp)) {
+            MapsSearchBar(
+                sport = sport,
+                onSport = planner::setSport,
+                search = search,
+                onSearch = { q ->
+                    val c = map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) } ?: vm.lastKnown()
+                    planner.search(q, c)
+                },
+                onPick = planner::focusOn,
+                onClear = planner::clearSearch,
+            )
+            Spacer(Modifier.height(8.dp))
+            TopControls(
+                onRoutes = { sheet = Sheet.ROUTES },
+                onPlan = {
+                    if (from == null) vm.lastKnown()?.let { planner.setFrom(Endpoint("Lokasi sekarang", it)) }
+                    planOpen = true
+                    planExpanded = true
+                },
+                onImport = { importLauncher.launch(arrayOf("*/*")) },
+                onAi = { sheet = Sheet.AI },
+            )
+            TerrainBanner(terrain, overlay, Modifier.padding(top = 8.dp))
+        }
+
+        Column(
+            Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.End,
+        ) {
+            WeatherBadge(weather, onOpenWeather)
+            // North-up map: the needle stays up and the label shows where the phone points.
+            MapCompass(mapBearing = 0f, heading = heading, headingUp = false)
+            RoundButton(Icons.Outlined.Layers, "Lapisan peta") { sheet = Sheet.LAYERS }
+            RoundButton(Icons.Outlined.ViewInAr, if (tilt3d) "Tampilan 2D" else "Tampilan 3D", active = tilt3d, onClick = planner::toggle3d)
+            RoundButton(Icons.Outlined.MyLocation, "Lokasi sekarang") {
+                vm.lastKnown()?.let { map?.animateCamera(CameraUpdateFactory.newLatLngZoom(it.toLatLng(), 15.0)) }
+            }
+            RoundButton(Icons.Outlined.Draw, if (drawing) "Keluar dari mode gambar" else "Gambar rute sendiri", active = drawing) {
+                if (drawing) planner.stopDrawing() else planner.startDrawing()
+            }
+        }
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             SnackbarHost(snackbar)
-            draft?.let { d ->
+            if (drawing) {
+                DrawRouteBar(
+                    points = draw.waypoints.size,
+                    distanceM = draw.path().zipWithNext { a, b -> Geo.distanceM(a, b) }.sum(),
+                    busy = drawBusy,
+                    onUndo = planner::undo,
+                    onClear = planner::clearDraw,
+                    onSave = { name -> planner.saveDrawn(name) { id -> vm.show(id) } },
+                    onClose = planner::stopDrawing,
+                )
+            } else if (focus != null && draft == null && !planOpen) {
+                PlacePanel(
+                    place = focus!!,
+                    onSave = { planner.savePlace(focus!!) },
+                    onRouteTo = {
+                        planner.setTo(focus)
+                        if (from == null) vm.lastKnown()?.let { planner.setFrom(Endpoint("Lokasi sekarang", it)) }
+                        planner.focusOn(null)
+                        planOpen = true
+                        planExpanded = true
+                    },
+                    onClose = { planner.focusOn(null) },
+                )
+            }
+            if (planOpen && !drawing) {
+                val readyOptions = (plan as? PlanState.Ready)?.let { planner.sorted(it.options) }.orEmpty()
+                PlannerPanel(
+                    expanded = planExpanded,
+                    onExpandedChange = { planExpanded = it },
+                    options = readyOptions,
+                    selected = selected,
+                    onSelect = planner::select,
+                    onClose = { planOpen = false; planner.clearPlan() },
+                ) {
+                    RoutePlannerSheet(
+                        from = from,
+                        to = to,
+                        here = vm.lastKnown(),
+                        focus = focus,
+                        saved = places,
+                        plan = plan,
+                        sort = sort,
+                        selected = selected,
+                        sorted = planner::sorted,
+                        onFrom = planner::setFrom,
+                        onTo = planner::setTo,
+                        onPlan = planner::plan,
+                        onSort = planner::setSort,
+                        // Picking an alternative shrinks the panel to its strip so the route is visible on the map.
+                        onSelect = { planner.select(it); planExpanded = false },
+                        onSave = { o, name -> planner.savePlanned(o, name) { id -> vm.show(id); planOpen = false } },
+                    )
+                }
+            }
+            if (!drawing && !planOpen) draft?.let { d ->
                 DraftPanel(
                     d,
                     onSave = { name, nav -> vm.saveDraftAsRoute(name, nav); if (nav) onNavigateRoute() },
@@ -145,7 +318,7 @@ fun MapsScreen(
                     onDiscard = vm::discardDraft,
                 )
             }
-            if (draft == null) {
+            if (draft == null && !drawing && focus == null && !planOpen) {
                 shown?.let { (r, _) ->
                     ShownPanel(
                         name = r.name,
@@ -157,7 +330,9 @@ fun MapsScreen(
                 }
             }
             Text(
-                attribution(base),
+                MapStyles.attribution(base, LocalMapboxToken.current) +
+                    (if (MapOverlay.BIKE_LANES in overlays) " · CyclOSM" else "") +
+                    (if (plan is PlanState.Ready || drawing) " · Rute: BRouter" else ""),
                 style = MaterialTheme.typography.labelMedium,
                 color = Palette.TextMuted,
                 modifier = Modifier.background(Palette.Bg.copy(alpha = 0.7f)).padding(horizontal = 6.dp, vertical = 2.dp),
@@ -168,7 +343,7 @@ fun MapsScreen(
     if (sheet != Sheet.NONE) {
         ModalBottomSheet(onDismissRequest = { sheet = Sheet.NONE }, containerColor = Palette.Surface) {
             when (sheet) {
-                Sheet.LAYERS -> LayersSheet(base, overlay, vm::setBase, vm::setOverlay)
+                Sheet.LAYERS -> MapLayersSheet(base, overlays, overlay, { vm.setBase(it) }, planner::toggleOverlay, vm::setOverlay)
                 Sheet.ROUTES -> RoutesSheet(
                     vm,
                     onShow = { vm.show(it); sheet = Sheet.NONE },
@@ -195,19 +370,22 @@ fun MapsScreen(
     }
 }
 
-private fun attribution(base: MapBase) = when (base) {
-    MapBase.STANDARD -> "© OpenFreeMap © OpenStreetMap"
-    MapBase.SATELLITE, MapBase.HYBRID -> "Citra © Esri, Maxar, Earthstar Geographics"
-}
-
 @Composable
-private fun TopControls(onLayers: () -> Unit, onRoutes: () -> Unit, onImport: () -> Unit, onAi: () -> Unit, modifier: Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MapButton("Layer", onLayers)
+private fun TopControls(onRoutes: () -> Unit, onPlan: () -> Unit, onImport: () -> Unit, onAi: () -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         MapButton("Rute", onRoutes)
+        MapButton("Rencana rute", onPlan)
         MapButton("Impor", onImport)
         MapButton("AI Route", onAi, accent = true)
     }
+}
+
+@Composable
+private fun RoundButton(icon: ImageVector, label: String, active: Boolean = false, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(48.dp).background(if (active) Palette.Accent else Palette.Bg.copy(alpha = 0.9f), MaterialTheme.shapes.medium),
+    ) { Icon(icon, contentDescription = label, tint = if (active) Palette.OnAccent else Palette.Text) }
 }
 
 @Composable
@@ -250,27 +428,6 @@ private fun legend(o: TerrainOverlay): String? = when (o) {
     TerrainOverlay.AVALANCHE -> "Kuning 30-35°, oranye 35-40°, merah 40-45°, ungu > 45°"
     TerrainOverlay.ASPECT -> "Biru = menghadap utara, kuning = selatan, hijau = timur, merah muda = barat"
     else -> null
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun LayersSheet(base: MapBase, overlay: TerrainOverlay, onBase: (MapBase) -> Unit, onOverlay: (TerrainOverlay) -> Unit) {
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Peta dasar", style = MaterialTheme.typography.titleMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MapBase.entries.forEach { b -> FilterChip(base == b, { onBase(b) }, { Text(b.label) }) }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text("Analisis medan", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Dihitung di ponsel dari data elevasi terbuka (AWS Terrarium). Arah lereng membantu menebak paparan matahari dan angin.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Palette.TextMuted,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TerrainOverlay.entries.forEach { o -> FilterChip(overlay == o, { onOverlay(o) }, { Text(o.label) }) }
-        }
-    }
 }
 
 @Composable

@@ -116,11 +116,12 @@ fun PrivacyZoneScreen(onBack: () -> Unit, vm: PrivacyZoneViewModel = hiltViewMod
                 )
             }
         }
-        LaunchedEffect(style, center, radius) {
+        val zoneColor = Palette.Warning
+        LaunchedEffect(style, center, radius, zoneColor) {
             val st = style ?: return@LaunchedEffect
             val c = center
-            MapLayers.setLine(st, "privacy-ring", if (c != null) MapLayers.ring(c, radius.toDouble()) else emptyList(), Palette.Warning, 3f)
-            MapLayers.setPoint(st, "privacy-center", c, Palette.Warning, 5f)
+            MapLayers.setLine(st, "privacy-ring", if (c != null) MapLayers.ring(c, radius.toDouble()) else emptyList(), zoneColor, 3f)
+            MapLayers.setPoint(st, "privacy-center", c, zoneColor, 5f)
         }
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(

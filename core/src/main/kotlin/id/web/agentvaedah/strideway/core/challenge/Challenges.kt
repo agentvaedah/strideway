@@ -52,3 +52,31 @@ object TrainingCalendar {
         return weeks.map { it to (hoursByWeek[it] ?: 0.0) }
     }
 }
+
+data class Award(val key: String, val id: ChallengeId, val month: YearMonth)
+
+/**
+ * Challenges are opt-in: only joined ones can be earned. An award is keyed by challenge and month,
+ * so the same challenge can be earned again next month.
+ */
+object Achievements {
+    fun key(id: ChallengeId, month: YearMonth): String = "${id.name}@$month"
+
+    fun parse(key: String): Pair<ChallengeId, YearMonth>? {
+        val parts = key.split('@')
+        if (parts.size != 2) return null
+        val id = runCatching { ChallengeId.valueOf(parts[0]) }.getOrNull() ?: return null
+        val month = runCatching { YearMonth.parse(parts[1]) }.getOrNull() ?: return null
+        return id to month
+    }
+
+    fun newlyEarned(
+        activities: List<ActivitySummary>,
+        month: YearMonth,
+        zone: ZoneId,
+        joined: Set<ChallengeId>,
+        alreadyEarned: Set<String>,
+    ): List<Award> = Challenges.monthly(activities, month, zone)
+        .filter { it.completed && it.id in joined && key(it.id, month) !in alreadyEarned }
+        .map { Award(key(it.id, month), it.id, month) }
+}

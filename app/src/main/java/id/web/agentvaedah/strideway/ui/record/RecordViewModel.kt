@@ -10,7 +10,15 @@ import id.web.agentvaedah.strideway.data.ble.BleHub
 import id.web.agentvaedah.strideway.data.location.GpsSource
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
+import id.web.agentvaedah.strideway.data.db.RouteEntity
+import id.web.agentvaedah.strideway.core.route.NavState
+import id.web.agentvaedah.strideway.core.training.WorkoutState
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherRepository
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
 import id.web.agentvaedah.strideway.data.repo.RouteRepository
+import id.web.agentvaedah.strideway.service.RecordingCueRunner
+import id.web.agentvaedah.strideway.service.WorkoutSession
+import id.web.agentvaedah.strideway.core.training.Workout
 import id.web.agentvaedah.strideway.service.HardwareKey
 import id.web.agentvaedah.strideway.service.HardwareKeyBus
 import id.web.agentvaedah.strideway.service.RecordingController
@@ -23,11 +31,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** SPLIT: map 75% with a compact metrics strip. METRICS: big numbers full screen. MAP: map only. */
 enum class DisplayMode { SPLIT, METRICS, MAP }
+
+/** FOLLOW tracks the rider heading-up; FREE after the user pans; OVERVIEW fits route and track. */
+enum class CameraMode { FOLLOW, FREE, OVERVIEW }
 
 data class NavRoute(val id: Long, val name: String, val points: List<LatLon>)
 
@@ -39,8 +52,33 @@ class RecordViewModel @Inject constructor(
     private val gps: GpsSource,
     private val ble: BleHub,
     private val settings: SettingsRepository,
+    cues: RecordingCueRunner,
+    private val workouts: WorkoutSession,
     routes: RouteRepository,
+    weatherRepo: WeatherRepository,
 ) : ViewModel() {
+    val weather: StateFlow<WeatherState> = weatherRepo.state
+
+    val nav: StateFlow<NavState?> = cues.nav
+    /** Session picked on the Latihan tab, shown on the standby screen before Start. */
+    val plannedWorkout: StateFlow<Workout?> = workouts.active
+
+    fun clearWorkout() = workouts.select(null)
+    val workoutState: StateFlow<WorkoutState?> = cues.workout
+    val rerouteLine: StateFlow<List<LatLon>?> = cues.rerouteLine
+    val savedRoutes: StateFlow<List<RouteEntity>> = routes.routes().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val routeAlerts: StateFlow<Boolean> = settings.voice.map { it.routeAlerts }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    private val _camera = MutableStateFlow(CameraMode.FOLLOW)
+    val camera: StateFlow<CameraMode> = _camera.asStateFlow()
+
+    private val _tilt3d = MutableStateFlow(false)
+    val tilt3d: StateFlow<Boolean> = _tilt3d.asStateFlow()
+
+    /** Heading-up rotates the map with the rider; north-up keeps north at the top. */
+    private val _headingUp = MutableStateFlow(true)
+    val headingUp: StateFlow<Boolean> = _headingUp.asStateFlow()
+
     val state: StateFlow<RecordingState> = controller.state
     val gpsError: StateFlow<String?> = controller.gpsError
 
@@ -107,8 +145,33 @@ class RecordViewModel @Inject constructor(
         _recovered.value = null
     }
 
-    fun clearNavRoute() {
-        viewModelScope.launch { settings.setActiveRouteId(null) }
+    fun clearNavRoute() = selectRoute(null)
+
+    fun selectRoute(id: Long?) {
+        viewModelScope.launch { settings.setActiveRouteId(id) }
+        if (id != null) _camera.value = CameraMode.OVERVIEW
+    }
+
+    fun setCamera(mode: CameraMode) {
+        _camera.value = mode
+    }
+
+    fun toggle3d() {
+        _tilt3d.value = !_tilt3d.value
+        _camera.value = CameraMode.FOLLOW
+    }
+
+    fun toggleHeadingUp() {
+        _headingUp.value = !_headingUp.value
+        _camera.value = CameraMode.FOLLOW
+    }
+
+    fun toggleRouteAlerts() {
+        viewModelScope.launch { settings.setRouteAlerts(!routeAlerts.value) }
+    }
+
+    fun setDisplay(mode: DisplayMode) {
+        _display.value = mode
     }
 
     fun cycleDisplay() {

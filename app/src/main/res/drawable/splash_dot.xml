@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash icon canvas is 288 dp; the dot is r = 8 dp at the centre, the size StridewaySplash draws. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <path
+        android:fillColor="@color/splash_dot"
+        android:pathData="M136,144a8,8 0 1,0 16,0a8,8 0 1,0 -16,0" />
+</vector>

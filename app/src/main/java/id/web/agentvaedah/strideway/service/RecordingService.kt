@@ -27,6 +27,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class RecordingService : LifecycleService() {
     @Inject lateinit var controller: RecordingController
+    @Inject lateinit var cues: RecordingCueRunner
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastText: String? = null
@@ -48,6 +49,8 @@ class RecordingService : LifecycleService() {
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Strideway:recording")
                 .apply { acquire(MAX_WAKE_MS) }
         }
+
+        cues.start()
 
         lifecycleScope.launch {
             controller.state.collectLatest { s ->
@@ -96,6 +99,7 @@ class RecordingService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        cues.stop()
         wakeLock?.takeIf { it.isHeld }?.release()
         wakeLock = null
         super.onDestroy()

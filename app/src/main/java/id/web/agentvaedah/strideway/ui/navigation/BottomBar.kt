@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Person
@@ -37,7 +37,7 @@ private val leftTabs = listOf(
     Tab(Routes.MAPS, "Peta", Icons.Outlined.Map),
 )
 private val rightTabs = listOf(
-    Tab(Routes.COACH, "Coach", Icons.Outlined.Forum),
+    Tab(Routes.TRAINING, "Latihan", Icons.Outlined.FitnessCenter),
     Tab(Routes.YOU, "You", Icons.Outlined.Person),
 )
 

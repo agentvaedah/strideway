@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder mark until the real Strideway logo exists: a stroked "S". -->
+<!-- Strideway icon (assets/branding/strideway-icon-color-dark.svg) inside the adaptive-icon safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:pathData="M66,42 C66,36 60,33 54,33 C47,33 42,37 42,43 C42,50 49,52 54,54 C60,56 66,58 66,65 C66,71 61,75 54,75 C47,75 42,72 42,66"
-        android:strokeColor="#FC4C02"
-        android:strokeWidth="8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:fillColor="#00000000" />
+    <group android:scaleX="0.5713" android:scaleY="0.5713" android:translateX="19.366" android:translateY="25.436">
+        <path
+            android:fillColor="#FF4F00"
+            android:fillType="evenOdd"
+            android:pathData="M51.21 8.00L87.90 8.00L106.53 31.66L98.73 68.34L70.04 92.00L33.36 92.00L14.73 68.34L22.53 31.66ZM49.60 0.00L92.91 0.00L115.23 28.34L106.02 71.66L71.66 100.00L28.34 100.00L6.02 71.66L15.23 28.34Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M69.47 22.50L53.49 22.50L35.89 37.01L31.85 56.00L74.85 56.00L74.42 58.01L65.35 65.50L54.33 65.50L51.78 77.50L67.77 77.50L85.37 62.99L89.40 44.00L46.40 44.00L46.83 41.99L55.91 34.50L66.92 34.50Z" />
+    </group>
 </vector>

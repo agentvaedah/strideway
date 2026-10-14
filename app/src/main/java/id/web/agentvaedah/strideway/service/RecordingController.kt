@@ -2,9 +2,12 @@ package id.web.agentvaedah.strideway.service
 
 import android.content.Context
 import android.content.Intent
+import android.hardware.GeomagneticField
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import id.web.agentvaedah.strideway.core.coach.VoiceCues
 import id.web.agentvaedah.strideway.core.geo.Geo
+import id.web.agentvaedah.strideway.core.geo.HeadingFilter
 import id.web.agentvaedah.strideway.core.model.Athlete
 import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.model.Sport
@@ -22,6 +25,7 @@ import id.web.agentvaedah.strideway.data.location.MotionSample
 import id.web.agentvaedah.strideway.data.location.MotionSensors
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.repo.ActivityRepository
+import id.web.agentvaedah.strideway.data.voice.VoicePlayer
 import id.web.agentvaedah.strideway.di.AppScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +63,11 @@ sealed interface RecordingState {
         val elevationProfile: List<Float>,
         val gpsFix: GpsFix,
         val sensors: List<SensorStatus>,
+        /** From a BLE Environmental Sensing device; null without one. */
+        val temperatureC: Double? = null,
+        /** Phone barometer when present, else a BLE environmental sensor. */
+        val pressureHpa: Double? = null,
+        val humidityPct: Double? = null,
     ) : RecordingState
 
     data class Finished(val activityId: Long) : RecordingState
@@ -78,6 +87,7 @@ class RecordingController @Inject constructor(
     private val ble: BleHub,
     private val activities: ActivityRepository,
     private val settings: SettingsRepository,
+    private val voice: VoicePlayer,
 ) {
     private val _state = MutableStateFlow<RecordingState>(RecordingState.Idle)
     val state: StateFlow<RecordingState> = _state.asStateFlow()
@@ -105,12 +115,18 @@ class RecordingController @Inject constructor(
         val buffer = ArrayList<TrackPointEntity>()
         var position: LatLon? = null
         var heading: Float? = null
+        val headingFilter = HeadingFilter()
+        var gpsCourse: Double? = null
+        var declination: Float? = null
         var fix = GpsFix.SEARCHING
         var lastGpsMs = 0L
         var lastSpeed = 0.0
         var lastAltitude: Double? = null
         var baroOffset: Double? = null
         var lastProfileDistance = 0.0
+        var temperatureC: Double? = null
+        var pressureHpa: Double? = null
+        var humidityPct: Double? = null
     }
 
     fun start(sport: Sport) {
@@ -130,6 +146,7 @@ class RecordingController @Inject constructor(
             _gpsError.value = null
             publish(startMs)
             starting.set(false)
+            speak(VoiceCues.startLine(sport))
             ble.connectSaved()
             launchCollectors()
         }
@@ -166,7 +183,11 @@ class RecordingController @Inject constructor(
         ses.lastGpsMs = s.timeMs
         ses.lastSpeed = speed
         if (s.altitudeM != null) ses.lastAltitude = s.altitudeM
-        if (speed > 1.0 && s.bearingDeg != null) ses.heading = s.bearingDeg
+        if (ses.declination == null) {
+            ses.declination = GeomagneticField(s.pos.lat.toFloat(), s.pos.lon.toFloat(), (s.altitudeM ?: 0.0).toFloat(), s.timeMs).declination
+        }
+        ses.gpsCourse = s.bearingDeg?.toDouble()?.takeIf { speed > 1.0 }
+        if (speed * 3.6 >= 6.0) ses.heading = ses.headingFilter.update(ses.gpsCourse, null, speed * 3.6)?.toFloat()
         record(ses, s.timeMs, s.pos, s.altitudeM, s.speedMps, interpolated = false)
     }
 
@@ -174,8 +195,11 @@ class RecordingController @Inject constructor(
         val ses = session ?: return@withLock
         when (m) {
             is MotionSample.Heading -> {
-                ses.dr.onHeading(m.degrees.toDouble())
-                if (ses.lastSpeed < 1.0 || ses.fix != GpsFix.OK) ses.heading = m.degrees
+                // Rotation vector gives magnetic north; GPS course and the map use true north.
+                val trueAzimuth = m.degrees.toDouble() + (ses.declination ?: 0f)
+                ses.dr.onHeading(trueAzimuth)
+                val speedKmh = if (ses.fix == GpsFix.OK) ses.lastSpeed * 3.6 else 0.0
+                ses.heading = ses.headingFilter.update(ses.gpsCourse, trueAzimuth, speedKmh)?.toFloat()
             }
             is MotionSample.Acceleration -> {
                 val h = Math.toRadians((ses.heading ?: 0f).toDouble())
@@ -184,6 +208,7 @@ class RecordingController @Inject constructor(
                 ses.dr.onForwardAcceleration(forward, m.timeMs)
             }
             is MotionSample.Pressure -> {
+                ses.pressureHpa = m.hpa
                 // Barometer is smooth but has no absolute datum; anchor it to GPS altitude once.
                 val gpsAlt = ses.lastAltitude
                 if (ses.baroOffset == null && gpsAlt != null && ses.fix == GpsFix.OK) ses.baroOffset = gpsAlt - m.altitudeM
@@ -199,6 +224,9 @@ class RecordingController @Inject constructor(
             is SensorReading.Cadence -> ses.acc.onCadence(r.rpm, r.timeMs)
             is SensorReading.Power -> ses.acc.onPower(r.watts, r.timeMs)
             is SensorReading.WheelSpeed -> Unit
+            is SensorReading.Temperature -> ses.temperatureC = r.celsius
+            is SensorReading.Pressure -> if (!motion.hasBarometer) ses.pressureHpa = r.hpa
+            is SensorReading.Humidity -> ses.humidityPct = r.percent
         }
     }
 
@@ -258,6 +286,9 @@ class RecordingController @Inject constructor(
                 elevationProfile = ses.profile.toList(),
                 gpsFix = ses.fix,
                 sensors = ble.status.value.values.toList(),
+                temperatureC = ses.temperatureC,
+                pressureHpa = ses.pressureHpa,
+                humidityPct = ses.humidityPct,
             )
         }
         _state.value = snapshot
@@ -285,6 +316,8 @@ class RecordingController @Inject constructor(
 
     fun stop() {
         scope.launch {
+            // Before endSession: the cue runner stops with the service, but the voice player is app-wide.
+            if (session != null) speak(VoiceCues.STOP_LINE)
             val ses = endSession() ?: return@launch
             val metrics = ses.acc.tick(System.currentTimeMillis())
             val empty = metrics.distanceM < MIN_SAVE_DISTANCE_M && ses.path.size < 2
@@ -298,10 +331,15 @@ class RecordingController @Inject constructor(
 
     fun discard() {
         scope.launch {
+            if (session != null) speak(VoiceCues.STOP_LINE)
             val ses = endSession() ?: return@launch
             withContext(Dispatchers.IO) { activities.delete(ses.activityId) }
             _state.value = RecordingState.Idle
         }
+    }
+
+    private suspend fun speak(text: String) {
+        if (settings.voice.first().enabled) voice.say(text)
     }
 
     fun acknowledgeFinished() {

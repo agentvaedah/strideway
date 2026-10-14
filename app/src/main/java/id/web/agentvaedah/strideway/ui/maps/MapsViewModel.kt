@@ -17,6 +17,10 @@ import id.web.agentvaedah.strideway.data.db.RouteEntity
 import id.web.agentvaedah.strideway.data.db.RouteSource
 import id.web.agentvaedah.strideway.data.files.TrackFileIo
 import id.web.agentvaedah.strideway.data.location.GpsSource
+import id.web.agentvaedah.strideway.data.location.MotionSample
+import id.web.agentvaedah.strideway.data.location.MotionSensors
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherRepository
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.prefs.TerrainOverlay
@@ -37,6 +41,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -75,7 +81,21 @@ class MapsViewModel @Inject constructor(
     private val routing: RoutingClient,
     private val terrain: TerrainRenderer,
     private val gps: GpsSource,
+    motion: MotionSensors,
+    private val weatherRepo: WeatherRepository,
 ) : ViewModel() {
+    val weather: StateFlow<WeatherState> = weatherRepo.state
+
+    /** Device azimuth for the compass badge, magnetic north; only collected while the map tab is visible. */
+    val heading: StateFlow<Float?> = motion.samples()
+        .filterIsInstance<MotionSample.Heading>()
+        .map<MotionSample.Heading, Float?> { it.degrees }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(2_000), null)
+
+    fun refreshWeather(lat: Double, lon: Double) {
+        viewModelScope.launch { weatherRepo.refresh(lat, lon) }
+    }
+
     val mapBase: StateFlow<MapBase> = settings.mapBase.stateIn(viewModelScope, SharingStarted.Eagerly, MapBase.STANDARD)
     val overlay: StateFlow<TerrainOverlay> = settings.terrainOverlay.stateIn(viewModelScope, SharingStarted.Eagerly, TerrainOverlay.NONE)
     val savedRoutes: StateFlow<List<RouteEntity>?> = routes.routes().stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -114,6 +134,8 @@ class MapsViewModel @Inject constructor(
     fun onCameraIdle(lat: Double, lon: Double, zoom: Double) {
         lastCamera = Triple(lat, lon, zoom)
         refreshTerrain(overlay.value, lat, lon, zoom)
+        // The repository caches by place, so panning around one area does not refetch.
+        refreshWeather(lat, lon)
     }
 
     private fun refreshTerrain(o: TerrainOverlay, lat: Double, lon: Double, zoom: Double) {

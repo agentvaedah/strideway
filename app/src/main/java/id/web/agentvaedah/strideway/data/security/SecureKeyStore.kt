@@ -33,19 +33,28 @@ private val Context.secretStore: DataStore<Preferences> by preferencesDataStore(
 class SecureKeyStore @Inject constructor(@ApplicationContext context: Context) {
     private val store = context.secretStore
 
-    private fun prefKey(p: LlmProviderId) = stringPreferencesKey("key_${p.name}")
+    /** Ids are enum names; LLM providers keep their original "key_<PROVIDER>" entries. */
+    private fun prefKey(id: String) = stringPreferencesKey("key_$id")
 
-    suspend fun put(provider: LlmProviderId, apiKey: String) {
+    suspend fun put(provider: LlmProviderId, apiKey: String) = put(provider.name, apiKey)
+
+    suspend fun get(provider: LlmProviderId): String? = get(provider.name)
+
+    suspend fun remove(provider: LlmProviderId) = remove(provider.name)
+
+    fun hasKey(provider: LlmProviderId): Flow<Boolean> = hasKey(provider.name)
+
+    suspend fun put(id: String, apiKey: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val ct = cipher.doFinal(apiKey.trim().toByteArray(Charsets.UTF_8))
         val packed = Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(ct, Base64.NO_WRAP)
-        store.edit { it[prefKey(provider)] = packed }
+        store.edit { it[prefKey(id)] = packed }
     }
 
     /** Null when no key is stored or it can no longer be decrypted (e.g. Keystore was reset). */
-    suspend fun get(provider: LlmProviderId): String? {
-        val packed = store.data.first()[prefKey(provider)] ?: return null
+    suspend fun get(id: String): String? {
+        val packed = store.data.first()[prefKey(id)] ?: return null
         val parts = packed.split(':')
         if (parts.size != 2) return null
         return runCatching {
@@ -55,11 +64,11 @@ class SecureKeyStore @Inject constructor(@ApplicationContext context: Context) {
         }.getOrNull()
     }
 
-    suspend fun remove(provider: LlmProviderId) {
-        store.edit { it.remove(prefKey(provider)) }
+    suspend fun remove(id: String) {
+        store.edit { it.remove(prefKey(id)) }
     }
 
-    fun hasKey(provider: LlmProviderId): Flow<Boolean> = store.data.map { it[prefKey(provider)] != null }
+    fun hasKey(id: String): Flow<Boolean> = store.data.map { it[prefKey(id)] != null }
 
     private fun secretKey(): SecretKey {
         val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
