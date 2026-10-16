@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strideway Share Mockup</title>
+<style>
+@font-face { font-family: "Strideway Sans"; src: url("../../assets/fonts/StridewaySans-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; }
+@font-face { font-family: "Outfit"; src: url("../../app/src/main/res/font/outfit_regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "Outfit"; src: url("../../app/src/main/res/font/outfit_medium.ttf") format("truetype"); font-weight: 500; }
+@font-face { font-family: "Outfit"; src: url("../../app/src/main/res/font/outfit_semibold.ttf") format("truetype"); font-weight: 600; }
+
+:root { --signal: #FF4F00; --ink: #0A0A0B; --amber: #FFB000; --gold: #E0A400; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #E4E4E7; color: #0A0A0B; font-family: "Outfit", system-ui, sans-serif; }
+a { color: inherit; }
+header.page { max-width: 1240px; margin: 0 auto; padding: 24px 16px 8px; }
+header.page h1 { font-family: "Strideway Sans", "Outfit", sans-serif; font-style: italic; font-size: 34px; margin: 0; }
+header.page p { margin: 6px 0 0; color: #5E5E66; max-width: 72ch; line-height: 1.5; }
+.controls { max-width: 1240px; margin: 0 auto; padding: 12px 16px 0; display: flex; flex-wrap: wrap; gap: 16px 24px; }
+.controls fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.controls legend { font-size: 12px; font-weight: 600; color: #5E5E66; padding: 0 0 6px; width: 100%; }
+.seg button { font: 600 14px "Outfit", sans-serif; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #C4C4CA; background: #fff; color: #0A0A0B; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: #0A0A0B; color: #fff; border-color: #0A0A0B; }
+button:focus-visible { outline: 3px solid #1F6FD1; outline-offset: 2px; }
+
+h2.group { max-width: 1240px; margin: 28px auto 0; padding: 0 16px; font-size: 18px; }
+.grid { max-width: 1240px; margin: 0 auto; padding: 12px 16px 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 28px 24px; }
+@media (max-width: 420px) { .grid { grid-template-columns: 1fr; } }
+figure { margin: 0; }
+.pair { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+figcaption { margin-top: 10px; }
+figcaption strong { display: block; font-size: 16px; }
+figcaption span { color: #5E5E66; font-size: 14px; line-height: 1.45; }
+.fmt { font-size: 11px; font-weight: 600; color: #5E5E66; margin-top: 4px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; background: #0A0A0B; color: #fff; border-radius: 6px; padding: 2px 6px; margin-left: 6px; vertical-align: 2px; }
+
+/* Canvas: authored in real 1080-wide pixels, scaled down for display. */
+.cv { position: relative; overflow: hidden; border-radius: 10px; box-shadow: 0 8px 24px -12px #0006; background: #0A0A0B; flex: none; }
+.cv.alpha { background: repeating-conic-gradient(#3A3A3F 0 25%, #4A4A50 0 50%) 0 0 / 24px 24px; }
+.alpha .stat .v, .alpha .stat .l { text-shadow: 0 2px 8px rgba(0,0,0,.7), 0 0 2px rgba(0,0,0,.8); }
+.art { position: absolute; left: 0; top: 0; width: 1080px; transform-origin: 0 0; color: #fff; font-family: "Outfit", sans-serif; }
+.art .full { position: absolute; inset: 0; }
+.art svg.full { width: 100%; height: 100%; display: block; }
+.scrim { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,.85)); }
+.pad { position: absolute; left: 60px; right: 60px; }
+.col { display: flex; flex-direction: column; }
+.brand { font-family: "Strideway Sans", "Outfit", sans-serif; font-style: italic; font-weight: 700; }
+.wm { height: 48px; display: block; }
+.ic { height: 96px; display: block; }
+.title { font-size: 44px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.date { font-size: 28px; color: rgba(255,255,255,.82); }
+.stats { display: grid; gap: 28px 32px; }
+.stat { min-width: 0; }
+.stat .l { font-size: 28px; color: rgba(255,255,255,.82); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .v { font-family: "Strideway Sans", "Outfit", sans-serif; font-style: italic; font-weight: 700; white-space: nowrap; overflow: hidden; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.stat .v small { font-family: "Outfit", sans-serif; font-style: normal; font-weight: 500; font-size: .42em; margin-left: 8px; }
+.panel { background: rgba(10,10,11,.88); border-radius: 40px; padding: 44px; }
+.mapbox { position: relative; overflow: hidden; border-radius: 32px; }
+.mapbox svg { width: 100%; height: 100%; display: block; }
+.shadowtext { text-shadow: 0 2px 6px rgba(0,0,0,.45); }
+
+/* Share sheet phone */
+.phone { width: 360px; max-width: 100%; height: 780px; border-radius: 28px; overflow: hidden; background: #0A0A0B; color: #F4F4F5; display: flex; flex-direction: column; box-shadow: 0 12px 32px -12px #0006; }
+.phone .bar { padding: 14px 16px 8px; display: flex; align-items: center; gap: 10px; }
+.phone .bar h3 { margin: 0; font-size: 18px; flex: 1; }
+.phone .x { all: unset; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; cursor: pointer; }
+.phone .prev { display: flex; justify-content: center; padding: 4px 16px 10px; }
+.phone .body { flex: 1; overflow-y: auto; padding: 0 16px 16px; scrollbar-width: none; }
+.phone .lbl { font-size: 12px; font-weight: 600; color: #A6A6AD; margin: 12px 0 8px; }
+.thumbs { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; }
+.thumb { all: unset; flex: none; width: 76px; cursor: pointer; text-align: center; font-size: 11px; color: #A6A6AD; }
+.thumb .cv { margin: 0 auto 6px; border-radius: 8px; outline: 2px solid transparent; outline-offset: 2px; box-shadow: none; }
+.thumb[aria-pressed="true"] { color: #F4F4F5; font-weight: 600; }
+.thumb[aria-pressed="true"] .cv { outline-color: var(--signal); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { all: unset; min-height: 36px; padding: 0 14px; border-radius: 999px; background: #1D1D20; color: #F4F4F5; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; cursor: pointer; }
+.chip[aria-pressed="true"] { background: #F4F4F5; color: #0A0A0B; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid #2E2E33; }
+.btn { all: unset; min-height: 48px; border-radius: 12px; display: grid; place-items: center; font-weight: 600; font-size: 15px; cursor: pointer; background: #1D1D20; color: #F4F4F5; }
+.btn.primary { background: var(--signal); color: #0A0A0B; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Bagikan dengan foto · Mockup</h1>
+  <p>Sepuluh template, masing-masing di Feed 4:5 dan Story 9:16. Template berpeta memakai tile peta asli di bawah garis rute. Angka mengecil otomatis bila tidak muat, jadi tidak ada lagi teks yang bertabrakan; coba pilih "Nilai ekstrem" untuk menguji. <a href="home-v05.html">Kembali ke mockup Home dan Rekam</a>.</p>
+</header>
+<div class="controls">
+  <fieldset class="seg" id="statsSet"><legend>Statistik</legend>
+    <button data-v="5" aria-pressed="true">5 stat (dengan power)</button><button data-v="4" aria-pressed="false">4 stat (tanpa power meter)</button><button data-v="x" aria-pressed="false">Nilai ekstrem</button>
+  </fieldset>
+  <fieldset class="seg" id="mapSet"><legend>Latar peta</legend>
+    <button data-v="std" aria-pressed="true">Standar</button><button data-v="sat" aria-pressed="false">Satelit</button><button data-v="topo" aria-pressed="false">Topo</button>
+  </fieldset>
+</div>
+
+<h2 class="group">Layar Bagikan di aplikasi</h2>
+<div class="grid"><figure id="sheet"></figure></div>
+
+<h2 class="group">Semua template</h2>
+<div class="grid" id="all"></div>
+
+<script>
+const STATS = {
+  "5": [["Distance","62,40","km"],["Elev Gain","1.084","m"],["Time","2h 31m",""],["Avg Power","212","W"],["Speed","24,8","km/h"]],
+  "4": [["Distance","62,40","km"],["Elev Gain","1.084","m"],["Time","2h 31m",""],["Speed","24,8","km/h"]],
+  "x": [["Distance","1.234,56","km"],["Elev Gain","12.480","m"],["Time","52h 17m",""],["Avg Power","1.212","W"],["Speed","38,6","km/h"]],
+};
+const TITLE = { "5": "Gowes pagi Sentul", "4": "Gowes pagi Sentul", "x": "Trans Jawa 1.234 km, Anyer sampai Banyuwangi tanpa menginap" };
+let statsKey = "5", mapKey = "std", uid = 0;
+const ROUTE = "M180 640 C240 560 260 470 340 450 S470 500 520 420 S640 300 700 340 S800 470 830 380";
+
+const PAL = {
+  std:  { land: "#EEEDEA", park: "#D3E5CC", water: "#BCD6EA", road: "#FFFFFF", major: "#FFD9A0", label: "#8A8A90" },
+  sat:  { land: "#3B4A2E", park: "#2C3D22", water: "#1F3442", road: "#8C8576", major: "#B7AE98", label: "#E8E4DA" },
+  topo: { land: "#F1EEDF", park: "#D7E6C4", water: "#A9CBE3", road: "#FFFFFF", major: "#F2B880", label: "#7A6A4E" },
+};
+
+// Map tile stand-in (land use, water, streets, contours on Topo) with the route drawn on top.
+function mapSvg(withTiles = true, stroke = 14) {
+  const id = "r" + (++uid), p = PAL[mapKey];
+  const tiles = withTiles ? `
+    <rect x="-1500" y="-1500" width="4000" height="4000" fill="${p.land}"/>
+    ${mapKey === "sat" ? Array.from({length: 160}, (_, i) => `<rect x="${(i*137)%3000-1000}" y="${(i*251)%3000-1000}" width="${120+(i%5)*30}" height="${90+(i%4)*40}" fill="${i%3 ? p.park : "#4A5A36"}" opacity=".8" transform="rotate(${(i*23)%40-20} ${(i*137)%3000-1000} ${(i*251)%3000-1000})"/>`).join("") : ""}
+    <path d="M560 0 L760 0 L720 220 L590 240 Z" fill="${p.park}"/>
+    <path d="M-1500 900 C-500 760 200 780 500 740 S800 700 2500 820 L2500 2500 L-1500 2500 Z" fill="${p.park}"/><path d="M-900 -600 L-300 -700 L-200 -100 L-800 0 Z" fill="${p.park}"/><path d="M1300 1300 L1900 1250 L1850 1900 L1250 1850 Z" fill="${p.park}"/>
+    <path d="M-1500 120 C-600 300 -200 140 180 260 S330 170 500 230 S820 330 1100 280 S1800 160 2500 300" stroke="${p.water}" stroke-width="46" fill="none"/>
+    ${mapKey === "topo" ? Array.from({length: 14}, (_, i) => `<ellipse cx="640" cy="560" rx="${80+i*110}" ry="${50+i*76}" fill="none" stroke="#B89A6A" stroke-width="2" opacity=".55"/>`).join("") : ""}
+    <g stroke="${p.road}" stroke-width="10" opacity="${mapKey === "sat" ? .55 : 1}">
+      ${Array.from({length: 30}, (_, i) => -1000 + i * 120).map(x => `<line x1="${x}" y1="-1500" x2="${x-210}" y2="2500"/>`).join("")}
+      ${Array.from({length: 22}, (_, i) => -1200 + i * 180).map(y => `<line x1="-1500" y1="${y}" x2="2500" y2="${y+160}"/>`).join("")}
+    </g>
+    <g stroke="${p.major}" stroke-width="20"><line x1="-1500" y1="695" x2="2500" y2="335"/><line x1="580" y1="-1500" x2="150" y2="2500"/></g>
+    <text x="610" y="130" font-family="Outfit" font-size="30" fill="${p.label}">Sentul</text>
+    <text x="120" y="420" font-family="Outfit" font-size="26" fill="${p.label}">Babakan Madang</text>` : "";
+  return `<svg class="full" viewBox="${withTiles ? "100 230 820 520" : "140 300 740 380"}" preserveAspectRatio="xMidYMid meet" style="overflow:hidden">
+    <defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0" stop-color="#FF4F00"/><stop offset="1" stop-color="#FFB000"/></linearGradient></defs>
+    ${tiles}
+    <path d="${ROUTE}" stroke="#0A0A0B" stroke-opacity=".75" stroke-width="${stroke + 10}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${ROUTE}" stroke="url(#${id})" stroke-width="${stroke}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="180" cy="640" r="${stroke*1.3}" fill="#fff"/><circle cx="180" cy="640" r="${stroke*.7}" fill="#2FB765"/>
+    <circle cx="830" cy="380" r="${stroke*1.3}" fill="#fff"/><circle cx="830" cy="380" r="${stroke*.7}" fill="#0A0A0B"/>
+  </svg>`;
+}
+
+// Rider's photo stand-in: dawn sky over hills and a road.
+function photoSvg() {
+  const id = "p" + (++uid);
+  return `<svg class="full" viewBox="0 0 1000 1250" preserveAspectRatio="xMidYMid slice">
+    <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2D4C7A"/><stop offset=".45" stop-color="#E7895A"/><stop offset=".62" stop-color="#F6C88B"/></linearGradient></defs>
+    <rect width="1000" height="1250" fill="url(#${id})"/>
+    <circle cx="690" cy="560" r="70" fill="#FFE8B8"/>
+    <path d="M0 640 L180 520 L330 600 L520 470 L700 590 L860 500 L1000 570 L1000 1250 L0 1250 Z" fill="#5C4E66"/>
+    <path d="M0 720 L220 640 L420 700 L640 620 L820 690 L1000 650 L1000 1250 L0 1250 Z" fill="#3A3448"/>
+    <path d="M0 820 C300 760 600 800 1000 760 L1000 1250 L0 1250 Z" fill="#2A3324"/>
+    <path d="M430 1250 L520 800 L560 800 L700 1250 Z" fill="#45454C"/>
+    <path d="M505 1250 L537 800 L543 800 L560 1250 Z" fill="#E8E2D2" opacity=".7"/>
+  </svg>`;
+}
+
+function elevSvg() {
+  const id = "e" + (++uid);
+  const pts = "0,300 60,290 120,270 180,240 240,250 300,200 360,150 420,120 480,140 540,90 600,60 660,90 720,140 780,180 840,210 900,230 960,250 1000,260";
+  return `<svg viewBox="0 0 1000 320" preserveAspectRatio="none" style="width:100%;height:100%;display:block">
+    <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#FF4F00" stop-opacity=".9"/><stop offset="1" stop-color="#FF4F00" stop-opacity=".05"/></linearGradient></defs>
+    <polygon points="0,320 ${pts} 1000,320" fill="url(#${id})"/>
+    <polyline points="${pts}" fill="none" stroke="#fff" stroke-width="5" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+const wordmark = (h = 48) => `<img class="wm" style="height:${h}px" src="../../assets/branding/strideway-wordmark-white.svg" alt="Strideway">`;
+const icon = (h = 96) => `<img class="ic" style="height:${h}px" src="../../assets/branding/strideway-icon-white.svg" alt="">`;
+const stat = (s, max) => `<div class="stat"><div class="l">${s[0]}</div><div class="v fit" data-max="${max}" style="font-size:${max}px">${s[1]}${s[2] ? `<small>${s[2]}</small>` : ""}</div></div>`;
+const grid = (list, cols, max, gap = "28px 32px") => `<div class="stats" style="grid-template-columns:repeat(${cols},minmax(0,1fr));gap:${gap}">${list.map(s => stat(s, max)).join("")}</div>`;
+const meta = () => `<div class="title">${TITLE[statsKey]}</div><div class="date">Kamis, 15 Okt 2026 · 06.12</div>`;
+
+// Each template returns markup for a 1080 x h canvas. Layout is flex-based so blocks stack instead of overlapping.
+const T = [
+  { key: "bottom", name: "Statistik bawah", note: "Foto penuh, statistik dalam grid 3 kolom di bawah. Story memberi ruang foto lebih tinggi.", photo: true,
+    render: (h, st) => `${photoSvg()}<div class="scrim" style="height:${h * 0.55}px"></div>
+      <div class="pad col shadowtext" style="bottom:60px;gap:28px">${meta()}${grid(st, 3, 76)}
+        <div style="display:flex;justify-content:space-between;align-items:center">${wordmark()}</div></div>` },
+  { key: "routestats", name: "Rute + statistik", note: "Foto, peta kecil ber-tile di kiri, kolom statistik di kanan. Judul di atas blok.", photo: true, map: true,
+    render: (h, st) => `${photoSvg()}<div class="scrim" style="height:${h * 0.7}px"></div>
+      <div class="pad col shadowtext" style="bottom:60px;gap:28px">${meta()}
+        <div style="display:grid;grid-template-columns:${h > 1500 ? "520px" : "460px"} 1fr;gap:40px;align-items:stretch">
+          <div class="mapbox" style="height:${h > 1500 ? 640 : 500}px">${mapSvg(true, 12)}</div>
+          <div class="col" style="justify-content:space-between;min-width:0">${st.map(s => stat(s, h > 1500 ? 70 : 60)).join("")}</div>
+        </div>${wordmark()}</div>` },
+  { key: "routeonly", name: "Tanpa foto", note: "PNG transparan untuk ditempel di Story. Rute tanpa tile, statistik 2 kolom; semua 5 stat muat di Feed.", alpha: true,
+    render: (h, st) => `<div class="pad col shadowtext" style="top:60px;bottom:60px;gap:40px">
+        <div style="flex:1;min-height:0;position:relative">${mapSvg(false, 18)}</div>
+        ${grid(st, 2, h > 1500 ? 100 : 84, "24px 40px")}
+        ${wordmark(56)}</div>` },
+  { key: "minimal", name: "Minimal", note: "Hanya jarak besar, satu baris ringkas, dan ikon. Untuk foto yang ingin tampil penuh.", photo: true,
+    render: (h, st) => `${photoSvg()}<div class="scrim" style="height:${h * 0.4}px"></div>
+      <div class="pad shadowtext" style="bottom:60px;display:flex;align-items:end;justify-content:space-between;gap:32px">
+        <div style="min-width:0;flex:1"><div class="v fit brand" data-max="190" style="font-size:190px;line-height:.95;white-space:nowrap;overflow:hidden">${st[0][1]}<small style="font-family:Outfit;font-style:normal;font-weight:500;font-size:.32em;margin-left:12px">km</small></div>
+          <div class="date fit" data-max="34" style="font-size:34px;white-space:nowrap;overflow:hidden;margin-top:12px">${st.slice(1).map(s => s[1] + (s[2] ? " " + s[2] : "")).join(" · ")}</div></div>
+        ${icon()}</div>` },
+  { key: "mapfull", name: "Peta penuh", note: "Peta ber-tile penuh dengan rute, panel gelap berisi statistik di bawah. Tidak butuh foto.", map: true,
+    render: (h, st) => `${mapSvg(true, 16)}
+      <div class="pad" style="top:60px;display:flex;justify-content:space-between;align-items:center"><span style="background:#0A0A0B;border-radius:20px;padding:14px 20px;display:inline-flex">${wordmark(40)}</span></div>
+      <div class="pad panel col" style="bottom:60px;gap:26px">${meta()}${grid(st, 3, 70)}</div>` },
+  { key: "photomap", name: "Foto + peta", note: "Foto di atas, peta di bawah, pita statistik di garis batas.", photo: true, map: true,
+    render: (h, st) => `<div style="position:absolute;left:0;right:0;top:0;height:${Math.round(h * 0.56)}px;overflow:hidden">${photoSvg()}</div>
+      <div style="position:absolute;left:0;right:0;bottom:0;height:${Math.round(h * 0.44)}px;overflow:hidden">${mapSvg(true, 12)}</div>
+      <div class="pad panel col" style="top:${Math.round(h * 0.56) - 150}px;gap:22px;padding:36px 40px">${grid(st.slice(0, 3), 3, 70)}
+        <div style="display:flex;justify-content:space-between;gap:24px;font-size:30px;color:rgba(255,255,255,.82)"><span>${st.slice(3).map(s => s[0] + " " + s[1] + (s[2] ? " " + s[2] : "")).join(" · ")}</span></div></div>
+      <div class="pad" style="top:60px">${wordmark()}</div>` },
+  { key: "bignum", name: "Angka besar", note: "Jarak raksasa di tengah, rute tipis di bawahnya, statistik lain kecil.", photo: true,
+    render: (h, st) => `${photoSvg()}<div class="full" style="background:rgba(10,10,11,.55)"></div>
+      <div class="pad col shadowtext" style="top:60px;bottom:60px;justify-content:space-between;align-items:center;text-align:center">
+        ${wordmark()}
+        <div class="col" style="align-items:center;width:100%">
+          <div class="title" style="max-width:100%">${TITLE[statsKey]}</div>
+          <div class="v fit brand" data-max="300" style="font-size:300px;line-height:1;white-space:nowrap;overflow:hidden;max-width:100%">${st[0][1]}</div>
+          <div style="font-size:48px;font-weight:600;letter-spacing:.2em;margin-top:-10px">KM</div>
+          <div style="width:520px;height:${h > 1500 ? 320 : 220}px;margin-top:30px;position:relative">${mapSvg(false, 14)}</div>
+        </div>
+        ${grid(st.slice(1), Math.min(4, st.length - 1), 54, "20px 24px")}</div>` },
+  { key: "elev", name: "Elevasi", note: "Profil tanjakan sebagai grafik area, tiga statistik utama di atasnya. Cocok untuk ride menanjak.", photo: true,
+    render: (h, st) => `${photoSvg()}<div class="scrim" style="height:${h * 0.65}px"></div>
+      <div class="pad" style="top:60px">${wordmark()}</div>
+      <div class="pad col shadowtext" style="bottom:60px;gap:26px">${meta()}${grid([st[1], st[0], st[2]], 3, 76)}
+        <div style="height:${h > 1500 ? 380 : 260}px;position:relative">${elevSvg()}
+          <div style="position:absolute;left:0;top:0;font-size:26px;color:rgba(255,255,255,.8)">1.162 m</div>
+          <div style="position:absolute;left:0;bottom:-36px;font-size:26px;color:rgba(255,255,255,.8)">0 km</div>
+          <div style="position:absolute;right:0;bottom:-36px;font-size:26px;color:rgba(255,255,255,.8)">${st[0][1]} km</div></div>
+        <div style="height:20px"></div></div>` },
+  { key: "card", name: "Kartu", note: "Foto tetap bersih; stiker kompak di pojok bawah berisi peta mini dan tiga angka.", photo: true, map: true,
+    render: (h, st) => `${photoSvg()}
+      <div class="panel col" style="position:absolute;left:60px;bottom:60px;width:640px;padding:28px;gap:22px;border-radius:44px">
+        <div class="mapbox" style="height:300px;border-radius:24px">${mapSvg(true, 10)}</div>
+        ${grid([st[0], st[2], st[1]], 3, 54, "16px 20px")}
+        <div style="display:flex;justify-content:space-between;align-items:center">${wordmark(36)}<span style="font-size:24px;color:rgba(255,255,255,.75)">15 Okt 2026</span></div></div>` },
+  { key: "pr", name: "Rekor", note: "Muncul bila aktivitas punya rekor pribadi: medali, jarak, waktu rekor, dan selisihnya.", photo: true,
+    render: (h, st) => `${photoSvg()}<div class="scrim" style="height:${h * 0.68}px"></div>
+      <div class="pad" style="top:60px">${wordmark()}</div>
+      <div class="pad col shadowtext" style="bottom:60px;gap:28px">
+        <div style="display:flex;align-items:center;gap:28px">
+          <div style="width:150px;height:150px;border-radius:50%;background:#E0A400;color:#0A0A0B;display:grid;place-items:center;font:700 72px Outfit;box-shadow:inset 0 -8px 0 rgba(0,0,0,.2);flex:none">1</div>
+          <div style="min-width:0"><div style="font-size:36px;font-weight:600">Rekor pribadi · 40 km</div>
+            <div class="v fit brand" data-max="150" style="font-size:150px;line-height:1;white-space:nowrap;overflow:hidden">1:12:08</div>
+            <div style="font-size:32px;color:#FFB000;font-weight:600">0:42 lebih cepat</div></div></div>
+        ${grid(st, 3, 60)}</div>` },
+];
+
+const FMT = { feed: { w: 1080, h: 1350, label: "Feed 4:5" }, story: { w: 1080, h: 1920, label: "Story 9:16" } };
+
+function canvas(t, fmt, displayW) {
+  const f = FMT[fmt], s = displayW / f.w;
+  const st = STATS[statsKey];
+  return `<div class="cv ${t.alpha ? "alpha" : ""}" style="width:${displayW}px;height:${Math.round(f.h * s)}px">
+    <div class="art" style="height:${f.h}px;transform:scale(${s})">${t.render(f.h, st)}</div></div>`;
+}
+
+// Shrink each value until it fits its column, the same rule the app applies with Paint.measureText.
+function fitAll(root = document) {
+  root.querySelectorAll(".fit").forEach(el => {
+    let size = parseFloat(el.dataset.max);
+    el.style.fontSize = size + "px";
+    while (el.scrollWidth > el.clientWidth + 1 && size > 12) { size -= 2; el.style.fontSize = size + "px"; }
+  });
+}
+
+function renderAll() {
+  uid = 0;
+  document.getElementById("all").innerHTML = T.map(t => `<figure>
+    <div class="pair">
+      <div>${canvas(t, "feed", 180)}<div class="fmt">Feed 4:5</div></div>
+      <div>${canvas(t, "story", 180)}<div class="fmt">Story 9:16</div></div>
+    </div>
+    <figcaption><strong>${t.name}${t.map ? '<span class="badge">peta</span>' : ""}${t.alpha ? '<span class="badge">PNG transparan</span>' : ""}</strong><span>${t.note}</span></figcaption>
+  </figure>`).join("");
+  renderSheet();
+  fitAll();
+}
+
+let sel = { t: 0, fmt: "feed", photo: 1 };
+function renderSheet() {
+  const t = T[sel.t];
+  const previewW = sel.fmt === "feed" ? 236 : 186;
+  document.getElementById("sheet").innerHTML = `<div class="phone">
+    <div class="bar"><h3>Bagikan dengan foto</h3><button class="x" aria-label="Tutup"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="prev">${canvas(t, sel.fmt, previewW)}</div>
+    <div class="body">
+      <div class="lbl">Template</div>
+      <div class="thumbs">${T.map((x, i) => `<button class="thumb" data-t="${i}" aria-pressed="${i === sel.t}">${canvas(x, "feed", 60)}${x.name}</button>`).join("")}</div>
+      <div class="lbl">Ukuran</div>
+      <div class="chips">${Object.entries(FMT).map(([k, f]) => `<button class="chip" data-fmt="${k}" aria-pressed="${k === sel.fmt}">${f.label}</button>`).join("")}</div>
+      ${t.map ? `<div class="lbl">Latar peta</div><div class="chips">${[["std","Standar"],["sat","Satelit"],["topo","Topo"]].map(([k, l]) => `<button class="chip" data-map="${k}" aria-pressed="${k === mapKey}">${l}</button>`).join("")}</div>` : ""}
+      ${t.photo ? `<div class="lbl">Foto</div><div class="chips"><button class="chip" aria-pressed="true">Foto 1</button><button class="chip" aria-pressed="false">Foto 2</button><button class="chip" aria-pressed="false">Dari galeri</button></div>` : ""}
+    </div>
+    <div class="actions"><button class="btn">Simpan ke galeri</button><button class="btn primary">Bagikan</button></div>
+  </div>
+  <figcaption><strong>Layar Bagikan</strong><span>Pratinjau besar di atas, deretan thumbnail template yang bisa digeser, ukuran Feed/Story, latar peta untuk template berpeta, dan pilihan foto. Ketuk thumbnail atau ukuran untuk mencoba.</span></figcaption>`;
+  const sheet = document.getElementById("sheet");
+  sheet.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { sel.t = +b.dataset.t; renderSheet(); fitAll(sheet); });
+  sheet.querySelectorAll("[data-fmt]").forEach(b => b.onclick = () => { sel.fmt = b.dataset.fmt; renderSheet(); fitAll(sheet); });
+  sheet.querySelectorAll("[data-map]").forEach(b => b.onclick = () => { mapKey = b.dataset.map; syncSeg("mapSet", mapKey); renderAll(); });
+}
+
+function syncSeg(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v)); }
+document.querySelectorAll("#statsSet button").forEach(b => b.onclick = () => { statsKey = b.dataset.v; syncSeg("statsSet", statsKey); renderAll(); });
+document.querySelectorAll("#mapSet button").forEach(b => b.onclick = () => { mapKey = b.dataset.v; syncSeg("mapSet", mapKey); renderAll(); });
+renderAll();
+document.fonts && document.fonts.ready.then(() => fitAll());
+</script>
+</body>
+</html>

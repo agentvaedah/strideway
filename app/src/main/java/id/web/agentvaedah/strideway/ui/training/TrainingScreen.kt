@@ -76,9 +76,9 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private val idLocale = Locale.forLanguageTag("id-ID")
@@ -277,7 +277,7 @@ private fun SessionRowSimple(w: Workout, onClick: () -> Unit) {
 
 /** Blocks as wide as each step and as tall as its intensity, so the shape of a session reads at a glance. */
 @Composable
-private fun IntensityStrip(w: Workout, modifier: Modifier) {
+internal fun IntensityStrip(w: Workout, modifier: Modifier) {
     val accent = Palette.Accent
     val muted = Palette.TextMuted.copy(alpha = 0.4f)
     Canvas(modifier.semantics { contentDescription = "Profil intensitas ${w.name}" }) {

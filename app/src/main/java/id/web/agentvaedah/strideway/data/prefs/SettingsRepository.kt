@@ -18,12 +18,12 @@ import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.data.remote.llm.LlmProviderId
 import id.web.agentvaedah.strideway.data.remote.llm.LlmSettings
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
 val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -70,7 +70,16 @@ enum class BikeType(val label: String) {
     NONE("Tidak bersepeda"),
 }
 
-data class UserProfile(val name: String = "", val bikeType: BikeType = BikeType.ROAD, val bikeName: String = "")
+const val BIO_MAX = 160
+
+data class UserProfile(
+    val name: String = "",
+    val bikeType: BikeType = BikeType.ROAD,
+    val bikeName: String = "",
+    val bio: String = "",
+    /** Absolute path of the stored profile picture; null when the rider has none. */
+    val photoPath: String? = null,
+)
 
 data class FuelSettings(
     val enabled: Boolean = true,
@@ -153,6 +162,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext context: Contex
         val userName = stringPreferencesKey("user_name")
         val bikeType = stringPreferencesKey("user_bike_type")
         val bikeName = stringPreferencesKey("user_bike_name")
+        val userBio = stringPreferencesKey("user_bio")
+        val userPhoto = stringPreferencesKey("user_photo_path")
 
         val joinedChallenges = stringSetPreferencesKey("challenges_joined")
         val awards = stringSetPreferencesKey("challenge_awards")
@@ -343,6 +354,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext context: Contex
             name = p[Keys.userName] ?: "",
             bikeType = p[Keys.bikeType]?.let { runCatching { BikeType.valueOf(it) }.getOrNull() } ?: BikeType.ROAD,
             bikeName = p[Keys.bikeName] ?: "",
+            bio = p[Keys.userBio] ?: "",
+            photoPath = p[Keys.userPhoto],
         )
     }.distinctUntilChanged()
 
@@ -351,7 +364,13 @@ class SettingsRepository @Inject constructor(@ApplicationContext context: Contex
             p[Keys.userName] = u.name.trim().take(40)
             p[Keys.bikeType] = u.bikeType.name
             p[Keys.bikeName] = u.bikeName.trim().take(40)
+            p[Keys.userBio] = u.bio.trim().take(BIO_MAX)
         }
+    }
+
+    /** Separate from [saveProfile] so editing the text fields never drops a picture picked meanwhile. */
+    suspend fun setProfilePhoto(path: String?) {
+        store.edit { p -> if (path == null) p.remove(Keys.userPhoto) else p[Keys.userPhoto] = path }
     }
 
     val joinedChallenges: Flow<Set<String>> = store.data.map { it[Keys.joinedChallenges] ?: emptySet() }.distinctUntilChanged()

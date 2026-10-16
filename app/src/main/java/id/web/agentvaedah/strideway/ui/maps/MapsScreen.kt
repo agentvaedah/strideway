@@ -4,18 +4,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Draw
-import androidx.compose.material.icons.outlined.Layers
-import androidx.compose.material.icons.outlined.MyLocation
-import androidx.compose.material.icons.outlined.ViewInAr
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.graphics.vector.ImageVector
-import id.web.agentvaedah.strideway.core.geo.Geo
-import id.web.agentvaedah.strideway.data.prefs.MapOverlay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,12 +17,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Draw
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.ViewInAr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -49,25 +45,30 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.web.agentvaedah.strideway.core.format.Format
+import id.web.agentvaedah.strideway.core.geo.Geo
 import id.web.agentvaedah.strideway.core.model.LatLon
+import id.web.agentvaedah.strideway.core.route.Maneuver
 import id.web.agentvaedah.strideway.data.db.RouteSource
 import id.web.agentvaedah.strideway.data.prefs.MapBase
+import id.web.agentvaedah.strideway.data.prefs.MapOverlay
 import id.web.agentvaedah.strideway.data.prefs.TerrainOverlay
 import id.web.agentvaedah.strideway.ui.components.LocalMapboxToken
 import id.web.agentvaedah.strideway.ui.components.MapCompass
 import id.web.agentvaedah.strideway.ui.components.MapHost
-import id.web.agentvaedah.strideway.ui.components.MapStyles
 import id.web.agentvaedah.strideway.ui.components.MapLayers
+import id.web.agentvaedah.strideway.ui.components.MapStyles
 import id.web.agentvaedah.strideway.ui.components.toLatLng
 import id.web.agentvaedah.strideway.ui.theme.Palette
 import id.web.agentvaedah.strideway.ui.weather.WeatherBadge
@@ -121,6 +122,9 @@ fun MapsScreen(
     var planOpen by rememberSaveable { mutableStateOf(false) }
     var planExpanded by rememberSaveable { mutableStateOf(true) }
     var exportId by remember { mutableLongStateOf(-1L) }
+    // Route being previewed in 3D: a planned alternative not yet saved, or the shown saved route.
+    var preview by remember { mutableStateOf<PreviewRoute?>(null) }
+    val shownManeuvers by vm.shownManeuvers.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::import) }
@@ -289,6 +293,18 @@ fun MapsScreen(
                     selected = selected,
                     onSelect = planner::select,
                     onClose = { planOpen = false; planner.clearPlan() },
+                    onPreview = readyOptions.getOrNull(selected)?.let { o ->
+                        { preview = PreviewRoute("Alternatif ${selected + 1}", o.points.map { it.latLon }, o.maneuvers, null) }
+                    },
+                    onNavigate = readyOptions.getOrNull(selected)?.let { o ->
+                        {
+                            planner.savePlanned(o, "Rute ${Format.km(o.lengthM)} km") { id ->
+                                vm.setNavigation(id)
+                                planOpen = false
+                                onNavigateRoute()
+                            }
+                        }
+                    },
                 ) {
                     RoutePlannerSheet(
                         from = from,
@@ -325,6 +341,7 @@ fun MapsScreen(
                         distanceM = r.distanceM,
                         gainM = r.elevationGainM,
                         onNavigate = { vm.setNavigation(r.id); onNavigateRoute() },
+                        onPreview = { preview = PreviewRoute(r.name, shown?.second.orEmpty(), shownManeuvers, r.id) },
                         onClose = vm::hideShown,
                     )
                 }
@@ -338,6 +355,17 @@ fun MapsScreen(
                 modifier = Modifier.background(Palette.Bg.copy(alpha = 0.7f)).padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }
+    }
+
+    preview?.let { pr ->
+        RoutePreview(
+            name = pr.name,
+            route = pr.points,
+            maneuvers = pr.maneuvers,
+            base = base,
+            onNavigate = pr.savedId?.let { id -> { preview = null; vm.setNavigation(id); onNavigateRoute() } },
+            onDismiss = { preview = null },
+        )
     }
 
     if (sheet != Sheet.NONE) {
@@ -574,7 +602,7 @@ private fun DraftPanel(
 }
 
 @Composable
-private fun ShownPanel(name: String, distanceM: Double, gainM: Double, onNavigate: () -> Unit, onClose: () -> Unit) {
+private fun ShownPanel(name: String, distanceM: Double, gainM: Double, onNavigate: () -> Unit, onPreview: () -> Unit, onClose: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -586,7 +614,11 @@ private fun ShownPanel(name: String, distanceM: Double, gainM: Double, onNavigat
             Text(name, style = MaterialTheme.typography.titleSmall)
             Text("${Format.km(distanceM)} km · naik ${Format.integer(gainM)} m", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
         }
+        TextButton(onClick = onPreview) { Text("Pratinjau 3D") }
         TextButton(onClick = onNavigate) { Text("Navigasi") }
         TextButton(onClick = onClose) { Text("Tutup") }
     }
 }
+
+/** What the 3D preview plays; [savedId] is set when the route is stored and can be navigated directly. */
+private data class PreviewRoute(val name: String, val points: List<LatLon>, val maneuvers: List<Maneuver>, val savedId: Long?)

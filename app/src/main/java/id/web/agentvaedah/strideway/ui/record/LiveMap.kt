@@ -1,12 +1,24 @@
 package id.web.agentvaedah.strideway.ui.record
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,27 +32,35 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import id.web.agentvaedah.strideway.core.format.Format
 import id.web.agentvaedah.strideway.core.model.LatLon
+import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.core.route.NavState
 import id.web.agentvaedah.strideway.data.prefs.MapBase
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
 import id.web.agentvaedah.strideway.service.GpsFix
 import id.web.agentvaedah.strideway.service.RecordingState
 import id.web.agentvaedah.strideway.ui.components.MapCompass
 import id.web.agentvaedah.strideway.ui.components.MapHost
 import id.web.agentvaedah.strideway.ui.components.MapLayers
 import id.web.agentvaedah.strideway.ui.components.toLatLng
+import id.web.agentvaedah.strideway.ui.theme.Brand
+import id.web.agentvaedah.strideway.ui.theme.MetricText
 import id.web.agentvaedah.strideway.ui.theme.Palette
 import id.web.agentvaedah.strideway.ui.weather.WeatherBadge
-import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
+import java.util.Locale
+import kotlin.math.roundToInt
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
-import kotlin.math.roundToInt
 
 /**
  * Full-screen live map behind the metrics sheet. [bottomInset] is the height the sheet covers, so the
@@ -52,6 +72,8 @@ fun LiveMap(
     base: MapBase,
     navRoute: List<LatLon>,
     nav: NavState?,
+    /** Length of the active route while no fix has placed the rider on it; null without a route. */
+    waitingRouteM: Double? = null,
     camera: CameraMode,
     tilt3d: Boolean,
     headingUp: Boolean,
@@ -65,6 +87,8 @@ fun LiveMap(
     weather: WeatherState,
     onOpenWeather: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Map-only display: the numbers live on the map itself, so speed stays in sight. */
+    showSpeed: Boolean = false,
 ) {
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
@@ -138,11 +162,11 @@ fun LiveMap(
         }
 
         Column(
-            Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp, end = if (nav != null) 12.dp else 72.dp),
+            Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp, end = if (nav != null || waitingRouteM != null) 12.dp else 72.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // With a route the turn banner owns the top; the compass and buttons move below it.
-            nav?.let { NavBanner(it) }
+            if (nav != null) NavBanner(nav) else waitingRouteM?.let { NavWaitingBanner(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GpsBadge(state.gpsFix)
                 WeatherBadge(weather, onOpenWeather)
@@ -150,7 +174,7 @@ fun LiveMap(
         }
 
         Column(
-            Modifier.align(Alignment.TopEnd).padding(12.dp).padding(top = if (nav != null) 150.dp else 0.dp),
+            Modifier.align(Alignment.TopEnd).padding(12.dp).padding(top = if (nav != null) 150.dp else if (waitingRouteM != null) 110.dp else 0.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -167,6 +191,69 @@ fun LiveMap(
                 onToggleAlerts = onToggleAlerts,
             )
         }
+
+        // After the rider pans away, a large button brings the map back to where they are.
+        AnimatedVisibility(
+            visible = camera == CameraMode.FREE && state.position != null,
+            enter = fadeIn() + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = if (showSpeed) 148.dp else 16.dp),
+        ) {
+            FloatingActionButton(
+                onClick = { onCamera(CameraMode.FOLLOW) },
+                containerColor = Palette.Surface,
+                contentColor = Palette.Info,
+                shape = CircleShape,
+            ) { Icon(Icons.Outlined.MyLocation, contentDescription = "Kembali ke lokasi saya") }
+        }
+
+        if (showSpeed) MapSpeedPanel(state, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp))
+    }
+}
+
+/** Speed as the largest figure on a dark chip, time and distance beside it; readable on any base map. */
+@Composable
+private fun MapSpeedPanel(state: RecordingState.Active, modifier: Modifier = Modifier) {
+    val m = state.metrics
+    val run = state.sport == Sport.RUN
+    val hasFix = state.gpsFix == GpsFix.OK || state.gpsFix == GpsFix.DEAD_RECKONING
+    val now = when {
+        !hasFix -> "--"
+        run -> Format.pace(m.speedKmh / 3.6)
+        else -> String.format(Locale.US, "%.1f", m.speedKmh).replace('.', ',')
+    }
+    val avg = if (run) Format.pace(m.avgSpeedKmh / 3.6) else String.format(Locale.US, "%.1f", m.avgSpeedKmh).replace('.', ',')
+    val max = String.format(Locale.US, "%.1f", m.maxSpeedKmh).replace('.', ',')
+    Row(modifier, verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier
+                .background(Brand.Ink.copy(alpha = 0.92f), MaterialTheme.shapes.large)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .clearAndSetSemantics { contentDescription = if (run) "Pace sekarang $now" else "Kecepatan sekarang $now kilometer per jam" },
+        ) {
+            Text(if (run) "pace /km" else "km/j", style = MetricText.Label, color = Color(0xFFA6A6AD))
+            Text(now, style = MetricText.Huge, color = Color(0xFFF4F4F5), maxLines = 1)
+            Text(if (run) "rata $avg" else "rata $avg · maks $max", style = MetricText.Label, color = Color(0xFFA6A6AD), maxLines = 1)
+        }
+        Spacer(Modifier.weight(1f))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.End) {
+            MiniStat(clock(m.movingMs).removePrefix("00:"), "waktu")
+            MiniStat(String.format(Locale.US, "%.2f", m.distanceM / 1000.0).replace('.', ','), "km")
+        }
+    }
+}
+
+@Composable
+private fun MiniStat(value: String, label: String) {
+    Column(
+        Modifier
+            .background(Palette.Surface.copy(alpha = 0.94f), MaterialTheme.shapes.medium)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .clearAndSetSemantics { contentDescription = "$label $value" },
+        horizontalAlignment = Alignment.End,
+    ) {
+        Text(value, style = MetricText.Small, color = Palette.Text, maxLines = 1)
+        Text(label, style = MetricText.Label, color = Palette.TextMuted)
     }
 }
 

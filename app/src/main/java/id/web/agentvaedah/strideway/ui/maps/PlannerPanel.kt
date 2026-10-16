@@ -23,9 +23,13 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Navigation
+import androidx.compose.material.icons.outlined.ViewInAr
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -52,6 +56,8 @@ fun PlannerPanel(
     selected: Int,
     onSelect: (Int) -> Unit,
     onClose: () -> Unit,
+    onPreview: (() -> Unit)? = null,
+    onNavigate: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val screenH = LocalConfiguration.current.screenHeightDp.dp
@@ -92,6 +98,12 @@ fun PlannerPanel(
             }
         } else {
             CollapsedStrip(options, selected, onSelect, onExpand = { onExpandedChange(true) }, onClose = onClose, minHeight = screenH * 0.1f)
+            if (options.isNotEmpty() && (onPreview != null || onNavigate != null)) {
+                Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    onPreview?.let { OutlinedButton(onClick = it, modifier = Modifier.weight(1f)) { Icon(Icons.Outlined.ViewInAr, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Pratinjau 3D") } }
+                    onNavigate?.let { Button(onClick = it, modifier = Modifier.weight(1f)) { Icon(Icons.Outlined.Navigation, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Navigasi") } }
+                }
+            }
         }
     }
 }

@@ -6,12 +6,16 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import id.web.agentvaedah.strideway.core.format.Format
 import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.core.model.Track
 import id.web.agentvaedah.strideway.core.model.TrackPoint
 import id.web.agentvaedah.strideway.core.privacy.PrivacyZone
 import id.web.agentvaedah.strideway.core.records.RecordKey
+import id.web.agentvaedah.strideway.core.share.ShareFormat
+import id.web.agentvaedah.strideway.core.share.ShareRecord
+import id.web.agentvaedah.strideway.core.share.ShareTemplate
 import id.web.agentvaedah.strideway.core.track.Gpx
 import id.web.agentvaedah.strideway.core.track.PlaybackPoint
 import id.web.agentvaedah.strideway.core.track.Tcx
@@ -21,8 +25,7 @@ import id.web.agentvaedah.strideway.data.db.ActivityEntity
 import id.web.agentvaedah.strideway.data.db.MediaEntity
 import id.web.agentvaedah.strideway.data.db.TrackPointEntity
 import id.web.agentvaedah.strideway.data.files.ShareComposer
-import id.web.agentvaedah.strideway.data.files.ShareFormat
-import id.web.agentvaedah.strideway.data.files.ShareTemplate
+import id.web.agentvaedah.strideway.data.files.ShareRequest
 import id.web.agentvaedah.strideway.data.files.TrackFileIo
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.data.prefs.PrivacyZoneSetting
@@ -30,6 +33,8 @@ import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.repo.ActivityRepository
 import id.web.agentvaedah.strideway.data.repo.MediaStore
 import id.web.agentvaedah.strideway.data.repo.RecordsRepository
+import java.io.File
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,8 +46,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import javax.inject.Inject
 
 enum class ExportFormat(val ext: String, val mime: String) {
     GPX("gpx", "application/gpx+xml"),
@@ -95,6 +98,14 @@ class ActivityDetailViewModel @Inject constructor(
     val badges: StateFlow<List<RecordKey>> = records.records
         .map { it.badgesFor(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Podium places this activity holds, record first, then second and third places. */
+    val achievements: StateFlow<List<Pair<RecordKey, Int>>> = records.records
+        .map { set -> set.ranksFor(id).entries.sortedWith(compareBy({ it.value }, { it.key.ordinal })).map { it.key to it.value } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val recordSet = records.records.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    private val mapboxToken = settings.mapboxToken.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private var points: List<TrackPointEntity> = emptyList()
     private var loadedFor: Long = -1
@@ -220,11 +231,39 @@ class ActivityDetailViewModel @Inject constructor(
         }
     }
 
-    /** Renders the share image from the same trimmed path the map shows. */
-    suspend fun renderShare(template: ShareTemplate, format: ShareFormat, photo: File?): Bitmap? {
+    /** Everything the share image needs, from the same trimmed path the map shows. */
+    fun shareRequest(photo: File?, base: MapBase): ShareRequest? {
         val s = state.value as? DetailState.Ready ?: return null
-        return composer.render(s.activity, s.path, photo, template, format)
+        return ShareRequest(
+            activity = s.activity,
+            path = s.path,
+            elevation = if (s.activity.hideMap) emptyList() else s.charts.elevation,
+            photo = photo,
+            base = base,
+            mapboxToken = mapboxToken.value,
+            record = shareRecord(),
+        )
     }
+
+    /** The most prestigious record this activity holds: a timed effort over the longest distance first. */
+    private fun shareRecord(): ShareRecord? {
+        val set = recordSet.value ?: return null
+        val held = set.badgesFor(id)
+        val key = held.filter { it.isEffort }.maxByOrNull { it.meters } ?: held.firstOrNull() ?: return null
+        val holder = set.holders[key] ?: return null
+        val value = when {
+            key.isEffort -> Format.duration((holder.value * 1000).toLong())
+            key == RecordKey.RIDE_AVG_SPEED -> "${Format.oneDecimal(holder.value).replace('.', ',')} km/h"
+            key == RecordKey.RIDE_ELEVATION -> "${Format.integer(holder.value)} m"
+            else -> "${Format.km(holder.value).replace('.', ',')} km"
+        }
+        return ShareRecord("Rekor pribadi · ${key.label}", value, null, 1)
+    }
+
+    fun shareAvailable(template: ShareTemplate, request: ShareRequest): Boolean = composer.available(template, request)
+
+    suspend fun renderShare(request: ShareRequest, template: ShareTemplate, format: ShareFormat, scale: Float = 1f): Bitmap =
+        composer.render(request, template, format, scale)
 
     suspend fun shareUri(bmp: Bitmap, template: ShareTemplate): Uri = composer.cacheForShare(bmp, template)
 

@@ -4,6 +4,12 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -13,10 +19,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -26,6 +35,7 @@ import id.web.agentvaedah.strideway.core.heatmap.HeatCell
 import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.ui.theme.Brand
+import id.web.agentvaedah.strideway.ui.theme.Palette
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -140,7 +150,8 @@ object MapStyles {
 
 /**
  * MapLibre MapView inside Compose. [onStyleLoaded] runs after every base-style change,
- * because switching style drops all runtime sources and layers.
+ * because switching style drops all runtime sources and layers. When the style cannot be fetched
+ * (offline, server down) a short notice covers the map instead of leaving a blank panel.
  */
 @Composable
 fun MapHost(
@@ -157,6 +168,18 @@ fun MapHost(
     val styleCallback by rememberUpdatedState(onStyleLoaded)
     val readyCallback by rememberUpdatedState(onMapReady)
     val mapboxToken = LocalMapboxToken.current
+    var failed by remember { mutableStateOf(false) }
+
+    DisposableEffect(mapView) {
+        val onFail = MapView.OnDidFailLoadingMapListener { failed = true }
+        val onLoaded = MapView.OnDidFinishLoadingStyleListener { failed = false }
+        mapView.addOnDidFailLoadingMapListener(onFail)
+        mapView.addOnDidFinishLoadingStyleListener(onLoaded)
+        onDispose {
+            mapView.removeOnDidFailLoadingMapListener(onFail)
+            mapView.removeOnDidFinishLoadingStyleListener(onLoaded)
+        }
+    }
 
     DisposableEffect(lifecycle, mapView) {
         var started = false
@@ -200,7 +223,20 @@ fun MapHost(
         m.setStyle(MapStyles.builder(base, mapboxToken)) { style -> styleCallback(m, style) }
     }
 
-    AndroidView(factory = { mapView }, modifier = modifier)
+    Box(modifier) {
+        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+        if (failed) {
+            Box(Modifier.fillMaxSize().background(Palette.SurfaceHigh), contentAlignment = Alignment.Center) {
+                Text(
+                    "Peta tidak bisa dimuat. Periksa koneksi internet; data rute tetap tersimpan.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Palette.TextMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(24.dp),
+                )
+            }
+        }
+    }
 }
 
 fun LatLon.toLatLng() = LatLng(lat, lon)
@@ -542,13 +578,19 @@ object MapLayers {
     }
 
     /** Frames [points]; [bottomPx] keeps them clear of a panel covering the bottom of the map. */
-    fun fit(map: MapLibreMap, points: List<LatLon>, paddingPx: Int = 96, bottomPx: Int = 0) {
+    /**
+     * Frames [points] with a short ease, keeping the current tilt and bearing so a 3D view stays 3D.
+     * [animate] false jumps instantly, for the first frame before the map is visible.
+     */
+    fun fit(map: MapLibreMap, points: List<LatLon>, paddingPx: Int = 96, bottomPx: Int = 0, animate: Boolean = true) {
         if (points.isEmpty()) return
-        if (points.size == 1 || points.all { it == points.first() }) {
-            map.moveCamera(CameraUpdateFactory.newLatLngZoom(points.first().toLatLng(), 15.0))
-            return
+        val update = if (points.size == 1 || points.all { it == points.first() }) {
+            CameraUpdateFactory.newLatLngZoom(points.first().toLatLng(), 15.0)
+        } else {
+            val bounds = LatLngBounds.Builder().includes(points.map { it.toLatLng() }).build()
+            val cam = map.cameraPosition
+            CameraUpdateFactory.newLatLngBounds(bounds, cam.bearing, cam.tilt, paddingPx, paddingPx, paddingPx, paddingPx + bottomPx)
         }
-        val bounds = LatLngBounds.Builder().includes(points.map { it.toLatLng() }).build()
-        map.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, paddingPx, paddingPx, paddingPx, paddingPx + bottomPx))
+        if (animate) map.animateCamera(update, 600) else map.moveCamera(update)
     }
 }

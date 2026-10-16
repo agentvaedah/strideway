@@ -1,5 +1,10 @@
 package id.web.agentvaedah.strideway.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,17 +24,18 @@ import id.web.agentvaedah.strideway.ui.coach.CoachKeysScreen
 import id.web.agentvaedah.strideway.ui.coach.CoachScreen
 import id.web.agentvaedah.strideway.ui.home.HomeScreen
 import id.web.agentvaedah.strideway.ui.maps.MapsScreen
+import id.web.agentvaedah.strideway.ui.motion.Motion
 import id.web.agentvaedah.strideway.ui.record.RecordScreen
 import id.web.agentvaedah.strideway.ui.theme.Palette
-import id.web.agentvaedah.strideway.ui.weather.WeatherScreen
 import id.web.agentvaedah.strideway.ui.training.TrainingScreen
+import id.web.agentvaedah.strideway.ui.weather.WeatherScreen
 import id.web.agentvaedah.strideway.ui.you.DevicesScreen
 import id.web.agentvaedah.strideway.ui.you.FuelScreen
 import id.web.agentvaedah.strideway.ui.you.GarageScreen
 import id.web.agentvaedah.strideway.ui.you.MapSettingsScreen
+import id.web.agentvaedah.strideway.ui.you.PrivacyZoneScreen
 import id.web.agentvaedah.strideway.ui.you.ProfileScreen
 import id.web.agentvaedah.strideway.ui.you.SettingsScreen
-import id.web.agentvaedah.strideway.ui.you.PrivacyZoneScreen
 import id.web.agentvaedah.strideway.ui.you.VoiceSettingsScreen
 import id.web.agentvaedah.strideway.ui.you.YouScreen
 
@@ -55,13 +61,30 @@ fun StridewayNavHost(navController: NavHostController, recording: Boolean) {
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            NavHost(navController, startDestination = Routes.HOME) {
+            // Tabs cross-fade; screens opened from a tab slide in a little from the right and back out on return.
+            NavHost(
+                navController,
+                startDestination = Routes.HOME,
+                enterTransition = {
+                    if (targetState.destination.route in tabRoutes) fadeIn(tween(Motion.MEDIUM))
+                    else fadeIn(tween(Motion.MEDIUM)) + slideInHorizontally(tween(Motion.MEDIUM)) { it / 8 }
+                },
+                exitTransition = { fadeOut(tween(Motion.SHORT)) },
+                popEnterTransition = { fadeIn(tween(Motion.MEDIUM)) },
+                popExitTransition = {
+                    if (initialState.destination.route in tabRoutes) fadeOut(tween(Motion.SHORT))
+                    else fadeOut(tween(Motion.SHORT)) + slideOutHorizontally(tween(Motion.MEDIUM)) { it / 8 }
+                },
+            ) {
                 composable(Routes.HOME) {
                     HomeScreen(
                         onOpenActivity = { navController.navigate(Routes.activity(it)) },
                         onStartRecording = { selectTab(Routes.RECORD) },
                         onImport = { selectTab(Routes.MAPS) },
                         onOpenGarage = { navController.navigate(Routes.GARAGE) },
+                        onOpenProfile = { selectTab(Routes.YOU) },
+                        onOpenTraining = { selectTab(Routes.TRAINING) },
+                        onRide = { selectTab(Routes.RECORD) },
                     )
                 }
                 composable(Routes.MAPS) {

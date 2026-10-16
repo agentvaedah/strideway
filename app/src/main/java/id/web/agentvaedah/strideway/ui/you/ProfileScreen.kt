@@ -1,5 +1,6 @@
 package id.web.agentvaedah.strideway.ui.you
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.background
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -32,9 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.web.agentvaedah.strideway.core.model.Gender
-import id.web.agentvaedah.strideway.data.prefs.BikeType
 import id.web.agentvaedah.strideway.core.physio.Zone
 import id.web.agentvaedah.strideway.core.physio.Zones
+import id.web.agentvaedah.strideway.data.prefs.BIO_MAX
+import id.web.agentvaedah.strideway.data.prefs.BikeType
 import id.web.agentvaedah.strideway.ui.components.BackTopBar
 import id.web.agentvaedah.strideway.ui.components.LoadingState
 import id.web.agentvaedah.strideway.ui.components.SectionTitle
@@ -74,6 +75,16 @@ fun ProfileScreen(onBack: () -> Unit, onOpenGarage: () -> Unit, vm: YouViewModel
                     onValueChange = { v -> vm.edit { it.copy(name = v.take(40)) } },
                     label = { Text("Nama") },
                     singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = f.bio,
+                    onValueChange = { v -> vm.edit { it.copy(bio = v.take(BIO_MAX)) } },
+                    label = { Text("Bio") },
+                    placeholder = { Text("Contoh: Gowes Sentul tiap akhir pekan, persiapan Bromo KOM") },
+                    supportingText = { Text("${f.bio.length}/$BIO_MAX") },
+                    minLines = 2,
+                    maxLines = 4,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text("Jenis sepeda", style = MaterialTheme.typography.labelLarge, color = Palette.TextMuted)

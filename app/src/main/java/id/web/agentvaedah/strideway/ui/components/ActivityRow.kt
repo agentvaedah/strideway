@@ -14,14 +14,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import id.web.agentvaedah.strideway.core.format.Format
 import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.data.db.ActivityEntity
 import id.web.agentvaedah.strideway.ui.activity.PrBadge
+import id.web.agentvaedah.strideway.ui.motion.pressScale
 import id.web.agentvaedah.strideway.ui.theme.Palette
 import java.time.Instant
 import java.time.ZoneId
@@ -31,8 +32,8 @@ import java.util.Locale
 private val dateFmt = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm", Locale.forLanguageTag("id-ID"))
 
 /**
- * Feed entry used on Home and in You > Aktivitas: name, date, PR badges, four stats and an offline route sketch.
- * The sketch is drawn from stored coordinates, so the feed works without map tiles or network.
+ * Feed entry used on Home and in You > Aktivitas: name, date, PR badges, four stats and the route on a map.
+ * The map picture falls back to a sketch from stored coordinates while loading or offline.
  */
 @Composable
 fun ActivityRow(
@@ -41,11 +42,13 @@ fun ActivityRow(
     onClick: () -> Unit,
     badges: List<String> = emptyList(),
     mapHeight: Dp = 120.dp,
+    modifier: Modifier = Modifier,
 ) {
     val date = Instant.ofEpochMilli(a.startMs).atZone(ZoneId.systemDefault()).format(dateFmt)
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
+            .pressScale()
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
@@ -71,7 +74,7 @@ fun ActivityRow(
         }
         if (!a.hideMap) {
             Spacer(Modifier.height(8.dp))
-            TrackThumbnail(path, Modifier.fillMaxWidth().height(mapHeight).clip(MaterialTheme.shapes.medium))
+            MapThumbnail("feed${a.id}_${path.size}_${path.firstOrNull().hashCode()}_${path.lastOrNull().hashCode()}", path, Modifier.fillMaxWidth().height(mapHeight).clip(MaterialTheme.shapes.medium))
         }
     }
     HorizontalDivider(color = Palette.Outline)

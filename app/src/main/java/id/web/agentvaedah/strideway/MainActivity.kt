@@ -50,10 +50,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // StridewaySplash draws the same dot in the same place on its first frame, so no exit animation.
         systemSplash.setOnExitAnimationListener { it.remove() }
-        // A plain preference, not DataStore: the answer is needed synchronously before the first frame.
-        val launchPrefs = getSharedPreferences(LAUNCH_PREFS, MODE_PRIVATE)
         val showSplash = SplashPolicy.shouldShow(
-            seen = launchPrefs.getBoolean(KEY_SPLASH_SEEN, false),
             restored = savedInstanceState != null,
             recordingActive = recording.state.value is RecordingState.Active,
             animationsEnabled = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f,
@@ -82,10 +79,7 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize()) {
                         StridewayNavHost(rememberNavController(), recording = state is RecordingState.Active)
                         AnimatedVisibility(visible = splashVisible, enter = EnterTransition.None, exit = fadeOut(tween(250))) {
-                            StridewaySplash(onFinished = {
-                                splashVisible = false
-                                launchPrefs.edit().putBoolean(KEY_SPLASH_SEEN, true).apply()
-                            })
+                            StridewaySplash(onFinished = { splashVisible = false })
                         }
                     }
                 }
@@ -105,10 +99,5 @@ class MainActivity : ComponentActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
-    }
-
-    private companion object {
-        const val LAUNCH_PREFS = "launch"
-        const val KEY_SPLASH_SEEN = "splash_seen"
     }
 }

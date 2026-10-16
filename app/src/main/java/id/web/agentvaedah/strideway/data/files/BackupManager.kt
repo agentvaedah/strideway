@@ -3,6 +3,7 @@ package id.web.agentvaedah.strideway.data.files
 import androidx.room.withTransaction
 import id.web.agentvaedah.strideway.core.model.Athlete
 import id.web.agentvaedah.strideway.core.model.Gender
+import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.data.db.ActivityEntity
 import id.web.agentvaedah.strideway.data.db.ComponentEntity
 import id.web.agentvaedah.strideway.data.db.ComponentEventEntity
@@ -12,17 +13,16 @@ import id.web.agentvaedah.strideway.data.db.RoutePointEntity
 import id.web.agentvaedah.strideway.data.db.SensorEntity
 import id.web.agentvaedah.strideway.data.db.StridewayDatabase
 import id.web.agentvaedah.strideway.data.db.TrackPointEntity
-import id.web.agentvaedah.strideway.data.prefs.PrivacyZoneSetting
 import id.web.agentvaedah.strideway.data.prefs.BikeType
+import id.web.agentvaedah.strideway.data.prefs.PrivacyZoneSetting
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.prefs.UserProfile
-import id.web.agentvaedah.strideway.core.model.LatLon
-import kotlinx.coroutines.flow.first
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 
 @Serializable
 data class BackupProfile(
@@ -37,6 +37,7 @@ data class BackupProfile(
     val name: String = "",
     val bikeType: String = "ROAD",
     val bikeName: String = "",
+    val bio: String = "",
 )
 
 @Serializable
@@ -86,7 +87,7 @@ class BackupManager @Inject constructor(
             createdMs = System.currentTimeMillis(),
             profile = BackupProfile(
                 a.gender.name, a.heightCm, a.weightKg, a.age, a.hrMax, a.hrRest, a.ftpWatts, a.bikeWeightKg,
-                u.name, u.bikeType.name, u.bikeName,
+                u.name, u.bikeType.name, u.bikeName, u.bio,
             ),
             privacy = BackupPrivacy(p.enabled, p.center?.lat, p.center?.lon, p.radiusM),
             wheelCircumferenceM = settings.wheelCircumferenceM.first(),
@@ -138,7 +139,7 @@ class BackupManager @Inject constructor(
                 ),
             )
             settings.saveProfile(
-                UserProfile(name, runCatching { BikeType.valueOf(bikeType) }.getOrDefault(BikeType.ROAD), bikeName),
+                UserProfile(name, runCatching { BikeType.valueOf(bikeType) }.getOrDefault(BikeType.ROAD), bikeName, bio),
             )
         }
         with(file.privacy) {

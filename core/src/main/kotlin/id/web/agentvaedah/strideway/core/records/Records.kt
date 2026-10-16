@@ -81,10 +81,25 @@ data class EffortRow(val activityId: Long, val key: RecordKey, val seconds: Doub
 
 data class RecordHolder(val key: RecordKey, val activityId: Long, val value: Double, val startMs: Long)
 
-class PersonalRecordSet(val holders: Map<RecordKey, RecordHolder>) {
+/** One of the three best results for a record; [rank] 1 is the record itself. */
+data class RecordRank(val rank: Int, val activityId: Long, val value: Double, val startMs: Long)
+
+/**
+ * [holders] are the current records; [top] keeps the three best per record, one per activity; [previous]
+ * is the record value that stood before the current holder set it, for "0:42 faster" lines.
+ */
+class PersonalRecordSet(
+    val holders: Map<RecordKey, RecordHolder>,
+    val top: Map<RecordKey, List<RecordRank>> = emptyMap(),
+    val previous: Map<RecordKey, Double> = emptyMap(),
+) {
     private val byActivity = holders.values.groupBy({ it.activityId }, { it.key })
 
     fun badgesFor(activityId: Long): List<RecordKey> = byActivity[activityId].orEmpty().sortedBy { it.ordinal }
+
+    /** Every record this activity places on the podium for, with its place. */
+    fun ranksFor(activityId: Long): Map<RecordKey, Int> =
+        top.mapNotNull { (k, list) -> list.firstOrNull { it.activityId == activityId }?.let { k to it.rank } }.toMap()
 }
 
 /**
@@ -111,10 +126,18 @@ object PersonalRecords {
             val a = byId[e.activityId] ?: continue
             if (a.sport == e.key.sport) candidates += RecordHolder(e.key, a.id, e.seconds, a.startMs)
         }
-        val holders = candidates.groupBy { it.key }.mapValues { (key, list) ->
+        val holders = HashMap<RecordKey, RecordHolder>()
+        val top = HashMap<RecordKey, List<RecordRank>>()
+        val previous = HashMap<RecordKey, Double>()
+        for ((key, list) in candidates.groupBy { it.key }) {
             val cmp = compareBy<RecordHolder> { if (key.better == Better.LOWER) it.value else -it.value }.thenBy { it.startMs }
-            list.minWith(cmp)
+            // One place per activity, even if a key were somehow stored twice for it.
+            val ranked = list.sortedWith(cmp).distinctBy { it.activityId }
+            val best = ranked.first()
+            holders[key] = best
+            top[key] = ranked.take(3).mapIndexed { i, h -> RecordRank(i + 1, h.activityId, h.value, h.startMs) }
+            list.filter { it.startMs < best.startMs }.minWithOrNull(cmp)?.let { previous[key] = it.value }
         }
-        return PersonalRecordSet(holders)
+        return PersonalRecordSet(holders, top, previous)
     }
 }

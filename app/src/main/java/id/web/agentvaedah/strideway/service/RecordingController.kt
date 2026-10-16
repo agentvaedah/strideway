@@ -14,6 +14,7 @@ import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.core.telemetry.DeadReckoning
 import id.web.agentvaedah.strideway.core.telemetry.LiveMetrics
 import id.web.agentvaedah.strideway.core.telemetry.SessionAccumulator
+import id.web.agentvaedah.strideway.core.telemetry.SpeedHistory
 import id.web.agentvaedah.strideway.core.track.TrackStats
 import id.web.agentvaedah.strideway.data.ble.BleHub
 import id.web.agentvaedah.strideway.data.ble.SensorReading
@@ -27,6 +28,11 @@ import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.repo.ActivityRepository
 import id.web.agentvaedah.strideway.data.voice.VoicePlayer
 import id.web.agentvaedah.strideway.di.AppScope
+import java.util.concurrent.atomic.AtomicBoolean
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,11 +48,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
-import kotlin.math.cos
-import kotlin.math.sin
 
 enum class GpsFix { SEARCHING, OK, DEAD_RECKONING, LOST }
 
@@ -68,6 +69,10 @@ sealed interface RecordingState {
         /** Phone barometer when present, else a BLE environmental sensor. */
         val pressureHpa: Double? = null,
         val humidityPct: Double? = null,
+        /** Current speed in km/h over the last minute, oldest first, for the sparkline. */
+        val speedHistory: List<Double> = emptyList(),
+        /** Change in km/h against ten seconds ago; null until that much history exists. */
+        val speedTrendKmh: Double? = null,
     ) : RecordingState
 
     data class Finished(val activityId: Long) : RecordingState
@@ -127,6 +132,7 @@ class RecordingController @Inject constructor(
         var temperatureC: Double? = null
         var pressureHpa: Double? = null
         var humidityPct: Double? = null
+        val speeds = SpeedHistory()
     }
 
     fun start(sport: Sport) {
@@ -182,6 +188,7 @@ class RecordingController @Inject constructor(
         ses.fix = GpsFix.OK
         ses.lastGpsMs = s.timeMs
         ses.lastSpeed = speed
+        ses.speeds.add(s.timeMs, speed * 3.6)
         if (s.altitudeM != null) ses.lastAltitude = s.altitudeM
         if (ses.declination == null) {
             ses.declination = GeomagneticField(s.pos.lat.toFloat(), s.pos.lon.toFloat(), (s.altitudeM ?: 0.0).toFloat(), s.timeMs).declination
@@ -289,6 +296,8 @@ class RecordingController @Inject constructor(
                 temperatureC = ses.temperatureC,
                 pressureHpa = ses.pressureHpa,
                 humidityPct = ses.humidityPct,
+                speedHistory = ses.speeds.samples(),
+                speedTrendKmh = ses.speeds.trend(ses.lastGpsMs),
             )
         }
         _state.value = snapshot

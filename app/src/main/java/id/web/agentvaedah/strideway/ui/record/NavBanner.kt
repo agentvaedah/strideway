@@ -28,10 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
 import id.web.agentvaedah.strideway.core.format.Format
 import id.web.agentvaedah.strideway.core.route.ManeuverType
@@ -123,6 +123,26 @@ fun NavBanner(s: NavState, modifier: Modifier = Modifier) {
                     Icon(a.maneuver.type.icon(), contentDescription = "lalu ${a.maneuver.type.phrase(a.maneuver.exit)}", tint = Palette.TextMuted, modifier = Modifier.size(18.dp))
                 }
             }
+        }
+    }
+}
+
+/** Route is set but the rider is not placed on it yet; says so instead of leaving the top of the map empty. */
+@Composable
+fun NavWaitingBanner(routeM: Double, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(Palette.Bg.copy(alpha = 0.94f), MaterialTheme.shapes.medium)
+            .padding(12.dp)
+            .clearAndSetSemantics { contentDescription = "Menunggu GPS untuk navigasi, rute ${distance(routeM)}" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.ArrowUpward, contentDescription = null, tint = Palette.TextMuted, modifier = Modifier.size(32.dp))
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text("Menunggu GPS untuk navigasi", style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+            Text("Rute ${distance(routeM)} · belokan muncul setelah posisi ditemukan", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
         }
     }
 }

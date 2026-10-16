@@ -96,6 +96,7 @@ private fun LiveDashboard(s: RecordingState.Active, vm: RecordViewModel, onOpenW
                 onMinimize = { vm.setDisplay(DisplayMode.SPLIT) },
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 nav = nav,
+                waitingRouteM = navRoute?.lengthM?.takeIf { nav == null },
                 workout = workout,
             )
             else -> {
@@ -106,6 +107,7 @@ private fun LiveDashboard(s: RecordingState.Active, vm: RecordViewModel, onOpenW
                         base = mapBase,
                         navRoute = reroute ?: navRoute?.points.orEmpty(),
                         nav = nav,
+                        waitingRouteM = navRoute?.lengthM?.takeIf { nav == null && reroute == null },
                         camera = camera,
                         tilt3d = tilt3d,
                         headingUp = headingUp,
@@ -118,7 +120,8 @@ private fun LiveDashboard(s: RecordingState.Active, vm: RecordViewModel, onOpenW
                         onSwitchRoute = { pickRoute = true },
                         weather = weather,
                         onOpenWeather = onOpenWeather,
-                        modifier = Modifier.fillMaxWidth().weight(if (mapOnly) 1f else if (workout != null) 0.65f else 0.75f),
+                        modifier = Modifier.fillMaxWidth().weight(if (mapOnly) 1f else if (workout != null) 0.62f else 0.7f),
+                        showSpeed = mapOnly,
                     )
                     if (!mapOnly) {
                         MinimizedMetrics(
@@ -126,7 +129,7 @@ private fun LiveDashboard(s: RecordingState.Active, vm: RecordViewModel, onOpenW
                             athlete = athlete,
                             onMaximize = { vm.setDisplay(DisplayMode.METRICS) },
                             // A workout adds its strip, so the metrics share grows a little to keep both readable.
-                            modifier = Modifier.fillMaxWidth().weight(if (workout != null) 0.35f else 0.25f).heightIn(min = 150.dp),
+                            modifier = Modifier.fillMaxWidth().weight(if (workout != null) 0.38f else 0.3f).heightIn(min = 190.dp),
                             workout = workout,
                         )
                     }

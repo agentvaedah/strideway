@@ -9,6 +9,7 @@ import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.core.model.Track
 import id.web.agentvaedah.strideway.core.model.TrackPoint
 import id.web.agentvaedah.strideway.core.route.LoopPlanner
+import id.web.agentvaedah.strideway.core.route.Maneuver
 import id.web.agentvaedah.strideway.core.route.RouteIntentException
 import id.web.agentvaedah.strideway.core.route.RouteIntents
 import id.web.agentvaedah.strideway.core.track.Gpx
@@ -19,8 +20,6 @@ import id.web.agentvaedah.strideway.data.files.TrackFileIo
 import id.web.agentvaedah.strideway.data.location.GpsSource
 import id.web.agentvaedah.strideway.data.location.MotionSample
 import id.web.agentvaedah.strideway.data.location.MotionSensors
-import id.web.agentvaedah.strideway.data.remote.weather.WeatherRepository
-import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.prefs.TerrainOverlay
@@ -29,9 +28,12 @@ import id.web.agentvaedah.strideway.data.remote.llm.LlmMessage
 import id.web.agentvaedah.strideway.data.remote.llm.LlmResult
 import id.web.agentvaedah.strideway.data.remote.routing.RoutingClient
 import id.web.agentvaedah.strideway.data.remote.routing.RoutingException
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherRepository
+import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
 import id.web.agentvaedah.strideway.data.repo.ActivityRepository
 import id.web.agentvaedah.strideway.data.repo.RouteRepository
 import id.web.agentvaedah.strideway.data.repo.toTrackPoint
+import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -39,12 +41,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** A route on screen that is not saved yet: an import awaiting a decision, or an AI result. */
 data class DraftRoute(
@@ -205,9 +206,13 @@ class MapsViewModel @Inject constructor(
         _draft.value = null
     }
 
+    private val _shownManeuvers = MutableStateFlow<List<Maneuver>>(emptyList())
+    val shownManeuvers: StateFlow<List<Maneuver>> = _shownManeuvers.asStateFlow()
+
     fun show(routeId: Long) {
         viewModelScope.launch {
             val r = routes.get(routeId) ?: return@launch
+            _shownManeuvers.value = routes.maneuvers(routeId)
             _shownRoute.value = r to routes.points(routeId).map { LatLon(it.lat, it.lon) }
         }
     }

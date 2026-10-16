@@ -1,6 +1,10 @@
 package id.web.agentvaedah.strideway.ui.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,12 +19,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -30,9 +37,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -42,7 +56,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.web.agentvaedah.strideway.core.challenge.Award
 import id.web.agentvaedah.strideway.core.format.Format
 import id.web.agentvaedah.strideway.core.physio.TrainingLoad
+import id.web.agentvaedah.strideway.data.prefs.UserProfile
 import id.web.agentvaedah.strideway.ui.components.ActivityRow
+import id.web.agentvaedah.strideway.ui.components.Avatar
 import id.web.agentvaedah.strideway.ui.components.BentoCell
 import id.web.agentvaedah.strideway.ui.components.BentoGrid
 import id.web.agentvaedah.strideway.ui.components.EmptyState
@@ -51,9 +67,15 @@ import id.web.agentvaedah.strideway.ui.components.LineChart
 import id.web.agentvaedah.strideway.ui.components.LoadingState
 import id.web.agentvaedah.strideway.ui.components.SectionTitle
 import id.web.agentvaedah.strideway.ui.components.Series
+import id.web.agentvaedah.strideway.ui.motion.AnimatedNumber
+import id.web.agentvaedah.strideway.ui.motion.Motion
+import id.web.agentvaedah.strideway.ui.motion.reduceMotion
+import id.web.agentvaedah.strideway.ui.motion.staggeredEnter
 import id.web.agentvaedah.strideway.ui.theme.MetricText
 import id.web.agentvaedah.strideway.ui.theme.Palette
+import id.web.agentvaedah.strideway.ui.training.IntensityStrip
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -67,6 +89,9 @@ fun HomeScreen(
     onStartRecording: () -> Unit,
     onImport: () -> Unit,
     onOpenGarage: () -> Unit,
+    onOpenProfile: () -> Unit = {},
+    onOpenTraining: () -> Unit = {},
+    onRide: () -> Unit = {},
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -77,7 +102,17 @@ fun HomeScreen(
         HomeState.Loading -> LoadingState("Memuat aktivitas", Modifier.fillMaxSize())
         is HomeState.Error -> ErrorState(s.message, Modifier.fillMaxSize())
         is HomeState.Ready -> LazyColumn(Modifier.fillMaxSize()) {
-            item { Text("Strideway", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(16.dp)) }
+            item { TodayHeader(s.profile, onOpenProfile) }
+            item { WeekSummary(s, Modifier.padding(horizontal = 16.dp).staggeredEnter(0)) }
+            item {
+                TrainingCard(
+                    s.weekLoad,
+                    s.today,
+                    onRide = { t -> vm.ride(t); onRide() },
+                    onOpenTraining = onOpenTraining,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).staggeredEnter(1),
+                )
+            }
             item { FormCard(s.fitness, s.anyEstimatedLoad, hasActivities = s.feed.isNotEmpty()) }
             item { InsightsCarousel(s, vm, onOpenGarage) }
             item { SectionTitle("Tantangan bulan ini") }
@@ -95,8 +130,136 @@ fun HomeScreen(
                     )
                 }
             }
-            items(s.feed, key = { it.activity.id }) { ActivityRow(it.activity, it.path, onClick = { onOpenActivity(it.activity.id) }) }
+            itemsIndexed(s.feed, key = { _, it -> it.activity.id }) { i, it ->
+                ActivityRow(it.activity, it.path, onClick = { onOpenActivity(it.activity.id) }, mapHeight = 190.dp, modifier = Modifier.staggeredEnter(i + 2))
+            }
             item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+/** "Today" and the date, Strava-style, with the rider's picture leading to the profile. */
+@Composable
+private fun TodayHeader(profile: UserProfile, onOpenProfile: () -> Unit) {
+    val date = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", idLocale)).replaceFirstChar { it.uppercase() }
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Today", style = MaterialTheme.typography.headlineLarge)
+            Text(date, style = MaterialTheme.typography.bodyMedium, color = Palette.TextMuted)
+        }
+        Avatar(
+            profile.photoPath,
+            profile.name.ifBlank { "Strideway" },
+            44.dp,
+            Modifier.clickable(role = Role.Button, onClickLabel = "Buka profil", onClick = onOpenProfile),
+        )
+    }
+}
+
+/** One line of the week: distance, climb and today's form. */
+@Composable
+private fun WeekSummary(s: HomeState.Ready, modifier: Modifier = Modifier) {
+    val form = s.fitness.lastOrNull()?.form?.roundToInt() ?: 0
+    Row(modifier.fillMaxWidth().background(Palette.Surface, MaterialTheme.shapes.large).padding(14.dp)) {
+        listOf(
+            Triple("Minggu ini", s.weekly.thisWeek.distanceKm, "km"),
+            Triple("Naik", s.weekly.thisWeek.elevationM, "m"),
+            Triple("Form", form.toDouble(), ""),
+        ).forEach { (label, v, unit) ->
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MetricText.Label, color = Palette.TextMuted)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    AnimatedNumber(
+                        v,
+                        format = { x -> if (label == "Form") (if (x >= 0.5) "+" else "") + x.roundToInt() else x.roundToInt().toString() },
+                        style = MetricText.Medium,
+                        color = Palette.Text,
+                    )
+                    if (unit.isNotEmpty()) {
+                        Spacer(Modifier.width(3.dp))
+                        Text(unit, style = MetricText.Label, color = Palette.TextMuted, modifier = Modifier.padding(bottom = 4.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Training at a glance: this week's load per day (today outlined) against last week's total, then today's
+ * planned session with its interval profile and a button that sets it up on the record screen.
+ */
+@Composable
+private fun TrainingCard(load: WeekLoad?, today: TodaySession?, onRide: (TodaySession) -> Unit, onOpenTraining: () -> Unit, modifier: Modifier = Modifier) {
+    val accent = Palette.Accent
+    val track = Palette.SurfaceHigh
+    val outline = Palette.Text
+    val reduce = reduceMotion()
+    val grow = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(Unit) { if (!reduce) grow.animateTo(1f, tween(Motion.LONG + 200)) }
+    Column(modifier.fillMaxWidth().background(Palette.Surface, MaterialTheme.shapes.large).padding(14.dp)) {
+        if (load != null) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("Beban latihan minggu ini", style = MetricText.Label, color = Palette.TextMuted, modifier = Modifier.weight(1f))
+                Text(load.total.roundToInt().toString(), style = MetricText.Medium, color = Palette.Text)
+                Spacer(Modifier.width(4.dp))
+                Text("TRIMP", style = MetricText.Label, color = Palette.TextMuted, modifier = Modifier.padding(bottom = 4.dp))
+            }
+            val vs = when {
+                load.lastWeek <= 0.0 -> "Minggu lalu belum ada latihan tercatat"
+                else -> "Minggu lalu ${load.lastWeek.roundToInt()} · ${((load.total / load.lastWeek) * 100).roundToInt()}% dari minggu lalu"
+            }
+            Text(vs, style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+            Spacer(Modifier.height(10.dp))
+            val top = (load.days.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+            Canvas(Modifier.fillMaxWidth().height(64.dp).semantics { contentDescription = "Beban latihan per hari minggu ini, total ${load.total.roundToInt()}" }) {
+                val gap = 6.dp.toPx()
+                val w = (size.width - gap * 6) / 7
+                load.days.forEachIndexed { i, v ->
+                    val h = (size.height * (v / top).toFloat() * grow.value).coerceAtLeast(4.dp.toPx())
+                    val x = i * (w + gap)
+                    drawRoundRect(if (v > 0) accent else track, Offset(x, size.height - h), Size(w, h), CornerRadius(4.dp.toPx()))
+                    if (i == load.todayIndex) drawRoundRect(outline, Offset(x - 2.dp.toPx(), size.height - h - 2.dp.toPx()), Size(w + 4.dp.toPx(), h + 4.dp.toPx()), CornerRadius(6.dp.toPx()), style = Stroke(1.5.dp.toPx()))
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                listOf("Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min").forEach { d ->
+                    Text(d, style = MetricText.Label, color = Palette.TextMuted, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                }
+            }
+            HorizontalDivider(color = Palette.Outline, modifier = Modifier.padding(vertical = 12.dp))
+        }
+        if (today != null) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        listOfNotNull("Latihan hari ini", today.phase?.let { "${it.label} minggu ${today.week}" }).joinToString(" · "),
+                        style = MetricText.Label,
+                        color = Palette.TextMuted,
+                    )
+                    Text(today.workout.name, style = MaterialTheme.typography.titleMedium)
+                }
+                Text(
+                    today.workout.durationS.let { d -> if (d >= 3600) "${d / 3600}j ${(d % 3600) / 60}m" else "${d / 60}m" },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Palette.Text,
+                    modifier = Modifier.background(Palette.SurfaceHigh, MaterialTheme.shapes.small).padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+            IntensityStrip(today.workout, Modifier.fillMaxWidth().height(44.dp).padding(vertical = 8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (today.done) {
+                    Text("Sudah dikayuh hari ini", style = MaterialTheme.typography.bodyMedium, color = Palette.Success, modifier = Modifier.padding(vertical = 12.dp))
+                } else {
+                    Button(onClick = { onRide(today) }) { Text("Kayuh sesi ini") }
+                }
+                OutlinedButton(onClick = onOpenTraining) { Text("Rencana") }
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Belum ada sesi terjadwal hari ini.", style = MaterialTheme.typography.bodyMedium, color = Palette.TextMuted, modifier = Modifier.weight(1f))
+                TextButton(onClick = onOpenTraining) { Text("Buka Latihan") }
+            }
         }
     }
 }

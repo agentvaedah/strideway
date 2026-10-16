@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,11 +43,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import id.web.agentvaedah.strideway.core.format.Format
 import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.model.Sport
 import id.web.agentvaedah.strideway.ui.components.MapHost
 import id.web.agentvaedah.strideway.ui.components.MapLayers
 import id.web.agentvaedah.strideway.ui.components.toLatLng
+import id.web.agentvaedah.strideway.ui.maps.RoutePreview
 import id.web.agentvaedah.strideway.ui.theme.Palette
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.maps.MapLibreMap
@@ -67,6 +70,8 @@ fun StandbyScreen(vm: RecordViewModel) {
     var permissionDenied by remember { mutableStateOf(false) }
     var gpsOff by remember { mutableStateOf(false) }
     var pickRoute by remember { mutableStateOf(false) }
+    var showCues by remember { mutableStateOf(false) }
+    var showPreview by remember { mutableStateOf(false) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
     val here: LatLon? = remember(map) { vm.lastKnownPosition() }
@@ -132,14 +137,30 @@ fun StandbyScreen(vm: RecordViewModel) {
                 }
             }
             navRoute?.let { r ->
-                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.AltRoute, contentDescription = null, tint = Palette.Info)
-                    Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(r.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                        Text("Rute navigasi aktif", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+                // Turn-by-turn is ready before the start: first turn, route length and the full list.
+                val first = r.cues.firstOrNull()
+                Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(first?.maneuver?.type?.icon() ?: Icons.Outlined.AltRoute, contentDescription = null, tint = Palette.Info, modifier = Modifier.size(28.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(r.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                            Text(
+                                buildString {
+                                    append("Navigasi siap · ${Format.km(r.lengthM).replace('.', ',')} km")
+                                    if (first != null) append(" · belokan pertama ${Format.km(first.atM).replace('.', ',')} km: ${first.maneuver.type.phrase(first.maneuver.exit)}")
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Palette.TextMuted,
+                                maxLines = 2,
+                            )
+                        }
+                        IconButton(onClick = vm::clearNavRoute) { Icon(Icons.Outlined.Close, contentDescription = "Lepas rute") }
                     }
-                    IconButton(onClick = vm::clearNavRoute) { Icon(Icons.Outlined.Close, contentDescription = "Lepas rute") }
+                    Row(Modifier.padding(start = 38.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { showCues = true }, enabled = r.cues.isNotEmpty()) { Text("Daftar belokan (${r.cues.size})") }
+                        TextButton(onClick = { showPreview = true }) { Text("Pratinjau 3D") }
+                    }
                 }
             }
             Row(
@@ -182,6 +203,11 @@ fun StandbyScreen(vm: RecordViewModel) {
                 Text(message, color = Palette.Error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
             }
         }
+    }
+
+    if (showCues) navRoute?.let { r -> CueSheetDialog(r.name, r.cues, r.lengthM) { showCues = false } }
+    if (showPreview) navRoute?.let { r ->
+        RoutePreview(r.name, r.points, r.maneuvers, mapBase, onNavigate = null, onDismiss = { showPreview = false })
     }
 
     if (pickRoute) {

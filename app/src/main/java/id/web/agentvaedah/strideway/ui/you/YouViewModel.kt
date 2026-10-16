@@ -12,12 +12,13 @@ import id.web.agentvaedah.strideway.data.db.SensorDao
 import id.web.agentvaedah.strideway.data.db.SensorEntity
 import id.web.agentvaedah.strideway.data.files.BackupManager
 import id.web.agentvaedah.strideway.data.files.TrackFileIo
+import id.web.agentvaedah.strideway.data.prefs.BikeType
 import id.web.agentvaedah.strideway.data.prefs.PrivacyZoneSetting
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.prefs.ThemeMode
-import id.web.agentvaedah.strideway.data.prefs.BikeType
 import id.web.agentvaedah.strideway.data.prefs.UserProfile
 import id.web.agentvaedah.strideway.service.RecordingController
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,13 +26,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** Text-field form state; values stay strings until validation so partial input is allowed. */
 data class ProfileForm(
     val name: String,
     val bikeType: BikeType,
     val bikeName: String,
+    val bio: String,
     val gender: Gender,
     val height: String,
     val weight: String,
@@ -76,11 +77,11 @@ data class ProfileForm(
         )
     }
 
-    fun toProfile() = UserProfile(name, bikeType, bikeName)
+    fun toProfile() = UserProfile(name, bikeType, bikeName, bio)
 
     companion object {
         fun from(a: Athlete, u: UserProfile) = ProfileForm(
-            u.name, u.bikeType, u.bikeName,
+            u.name, u.bikeType, u.bikeName, u.bio,
             a.gender, trim(a.heightCm), trim(a.weightKg), a.age.toString(), a.hrMax.toString(),
             a.hrRest.toString(), a.ftpWatts.toString(), trim(a.bikeWeightKg),
         )

@@ -9,6 +9,7 @@ import id.web.agentvaedah.strideway.core.challenge.ChallengeId
 import id.web.agentvaedah.strideway.core.challenge.ChallengeProgress
 import id.web.agentvaedah.strideway.core.challenge.Challenges
 import id.web.agentvaedah.strideway.core.challenge.TrainingCalendar
+import id.web.agentvaedah.strideway.core.gear.GearLevel
 import id.web.agentvaedah.strideway.core.geo.Polyline
 import id.web.agentvaedah.strideway.core.model.ActivitySummary
 import id.web.agentvaedah.strideway.core.model.Athlete
@@ -16,6 +17,7 @@ import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.physio.TrainingLoad
 import id.web.agentvaedah.strideway.core.physio.Zone
 import id.web.agentvaedah.strideway.core.physio.Zones
+import id.web.agentvaedah.strideway.core.privacy.PrivacyZone
 import id.web.agentvaedah.strideway.core.stats.HrSummary
 import id.web.agentvaedah.strideway.core.stats.ProgressStats
 import id.web.agentvaedah.strideway.core.stats.StatMetric
@@ -24,17 +26,29 @@ import id.web.agentvaedah.strideway.core.stats.StatSeries
 import id.web.agentvaedah.strideway.core.stats.StreakInfo
 import id.web.agentvaedah.strideway.core.stats.Streaks
 import id.web.agentvaedah.strideway.core.stats.WeeklySnapshot
-import id.web.agentvaedah.strideway.core.privacy.PrivacyZone
 import id.web.agentvaedah.strideway.core.track.TrackEdit
+import id.web.agentvaedah.strideway.core.training.Phase
+import id.web.agentvaedah.strideway.core.training.Workout
+import id.web.agentvaedah.strideway.core.training.WorkoutLibrary
 import id.web.agentvaedah.strideway.data.db.ActivityEntity
+import id.web.agentvaedah.strideway.data.prefs.BikeType
 import id.web.agentvaedah.strideway.data.prefs.PrivacyZoneSetting
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
-import id.web.agentvaedah.strideway.core.gear.GearLevel
-import id.web.agentvaedah.strideway.data.prefs.BikeType
+import id.web.agentvaedah.strideway.data.prefs.UserProfile
 import id.web.agentvaedah.strideway.data.repo.ActivityRepository
 import id.web.agentvaedah.strideway.data.repo.GarageItem
 import id.web.agentvaedah.strideway.data.repo.GearRepository
+import id.web.agentvaedah.strideway.data.repo.StoredPlan
+import id.web.agentvaedah.strideway.data.repo.TrainingRepository
 import id.web.agentvaedah.strideway.data.repo.toStat
+import id.web.agentvaedah.strideway.service.WorkoutSession
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,11 +58,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.ZoneId
-import javax.inject.Inject
 
 data class FeedItem(val activity: ActivityEntity, val path: List<LatLon>)
 
@@ -67,6 +76,12 @@ data class BikeInsight(
 
 data class ChallengeCard(val progress: ChallengeProgress, val joined: Boolean, val earned: Boolean)
 
+/** Monday-to-Sunday training load (TRIMP) of the current week, with last week's total to compare. */
+data class WeekLoad(val days: List<Double>, val todayIndex: Int, val total: Double, val lastWeek: Double)
+
+/** Today's session from the Latihan plan, ready to ride. */
+data class TodaySession(val workout: Workout, val sessionId: Long, val phase: Phase?, val week: Int, val done: Boolean)
+
 sealed interface HomeState {
     data object Loading : HomeState
     data class Error(val message: String) : HomeState
@@ -84,6 +99,9 @@ sealed interface HomeState {
         val hrZones: List<Zone>,
         val newAwards: List<Award>,
         val bike: BikeInsight? = null,
+        val weekLoad: WeekLoad? = null,
+        val today: TodaySession? = null,
+        val profile: UserProfile = UserProfile(),
     ) : HomeState
 }
 
@@ -92,6 +110,8 @@ class HomeViewModel @Inject constructor(
     activities: ActivityRepository,
     private val settings: SettingsRepository,
     gear: GearRepository,
+    training: TrainingRepository,
+    private val workouts: WorkoutSession,
 ) : ViewModel() {
     private val zone: ZoneId = ZoneId.systemDefault()
     private val month = MutableStateFlow(YearMonth.now(zone))
@@ -109,9 +129,11 @@ class HomeViewModel @Inject constructor(
         combine(range, metric) { r, m -> r to m },
     ) { list, p, m, (r, met) ->
         build(list, p, m, r, met)
-    }.combine(combine(gear.garage, settings.profile) { g, u -> g to u }) { state, (g, u) ->
+    }.combine(combine(gear.garage, settings.profile, training.plan) { g, u, plan -> Triple(g, u, plan) }) { state, (g, u, plan) ->
         val active = g.active.sortedByDescending { it.status.fraction }
         state.copy(
+            profile = u,
+            today = plan?.let { todaySession(it) },
             bike = BikeInsight(
                 bikeName = u.bikeName.ifBlank { u.bikeType.label },
                 rideKm = g.totalRideKm,
@@ -135,6 +157,17 @@ class HomeViewModel @Inject constructor(
 
     fun nextMonth() {
         if (month.value < YearMonth.now(zone)) month.value = month.value.plusMonths(1)
+    }
+
+    fun ride(t: TodaySession) = workouts.select(t.workout, t.sessionId)
+
+    private fun todaySession(plan: StoredPlan): TodaySession? {
+        val day = LocalDate.now(zone)
+        val s = plan.sessions.firstOrNull { it.date == day } ?: return null
+        val w = WorkoutLibrary.byId(s.workoutId)?.scaled(plan.level) ?: return null
+        val phase = plan.phases.lastOrNull { !it.first.isAfter(day) }?.second
+        val week = (ChronoUnit.DAYS.between(plan.start, day) / 7 + 1).toInt().coerceAtLeast(1)
+        return TodaySession(w, s.id, phase, week, s.doneActivityId != null)
     }
 
     fun setRange(r: StatRange) { range.value = r }
@@ -179,7 +212,20 @@ class HomeViewModel @Inject constructor(
             hr = ProgressStats.hrSummary(stats, StatRange.M1, localToday, zone, hrZones),
             hrZones = hrZones,
             newAwards = Achievements.newlyEarned(summaries, thisMonth, zone, joined, p.awards),
+            weekLoad = weekLoad(list, localToday),
         )
+    }
+
+    private fun weekLoad(list: List<ActivityEntity>, today: LocalDate): WeekLoad {
+        val monday = today.with(DayOfWeek.MONDAY)
+        val days = DoubleArray(7)
+        var last = 0.0
+        for (a in list) {
+            val d = Instant.ofEpochMilli(a.startMs).atZone(zone).toLocalDate()
+            val i = ChronoUnit.DAYS.between(monday, d).toInt()
+            if (i in 0..6) days[i] += a.trimp else if (i in -7..-1) last += a.trimp
+        }
+        return WeekLoad(days.toList(), ChronoUnit.DAYS.between(monday, today).toInt(), days.sum(), last)
     }
 
     private companion object {

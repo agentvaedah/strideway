@@ -119,6 +119,45 @@ class PersonalRecordsTest {
     }
 
     @Test
+    fun keepsTheThreeBestInOrder() {
+        val efforts = listOf(
+            EffortRow(1, RecordKey.RIDE_5K, 640.0),
+            EffortRow(2, RecordKey.RIDE_5K, 600.0),
+            EffortRow(3, RecordKey.RIDE_5K, 700.0),
+            EffortRow(4, RecordKey.RIDE_5K, 620.0),
+        )
+        val pr = PersonalRecords.compute((1L..4L).map { act(it, it, 6.0) }, efforts)
+        val top = pr.top.getValue(RecordKey.RIDE_5K)
+        assertEquals(listOf(2L, 4L, 1L), top.map { it.activityId })
+        assertEquals(listOf(1, 2, 3), top.map { it.rank })
+    }
+
+    @Test
+    fun previousRecordIsTheBestBeforeTheHolder() {
+        // Activity 3 set the record after 1 and 2; the one it beat is activity 1's 620 s, not 2's later 650 s.
+        val efforts = listOf(EffortRow(1, RecordKey.RIDE_5K, 620.0), EffortRow(2, RecordKey.RIDE_5K, 650.0), EffortRow(3, RecordKey.RIDE_5K, 580.0))
+        val pr = PersonalRecords.compute(listOf(act(1, 1, 6.0), act(2, 2, 6.0), act(3, 3, 6.0)), efforts)
+        assertEquals(620.0, pr.previous[RecordKey.RIDE_5K]!!, 1e-9)
+    }
+
+    @Test
+    fun firstEverRecordHasNoPrevious() {
+        val pr = PersonalRecords.compute(listOf(act(1, 0, 30.0)), emptyList())
+        assertTrue(pr.previous[RecordKey.RIDE_LONGEST] == null)
+    }
+
+    @Test
+    fun ranksForAnActivityIncludeSecondAndThird() {
+        val efforts = listOf(EffortRow(1, RecordKey.RIDE_5K, 600.0), EffortRow(2, RecordKey.RIDE_5K, 610.0), EffortRow(2, RecordKey.RIDE_10K, 1300.0))
+        val pr = PersonalRecords.compute(listOf(act(1, 0, 6.0), act(2, 1, 12.0)), efforts)
+        val ranks = pr.ranksFor(2)
+        assertEquals(2, ranks.getValue(RecordKey.RIDE_5K))
+        assertEquals(1, ranks.getValue(RecordKey.RIDE_10K))
+        // Badges stay first-place only, as before.
+        assertTrue(RecordKey.RIDE_5K !in pr.badgesFor(2))
+    }
+
+    @Test
     fun labels() {
         assertEquals("5 km tercepat", RecordKey.RIDE_5K.label)
         assertEquals("Ride terjauh", RecordKey.RIDE_LONGEST.label)

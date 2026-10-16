@@ -3,26 +3,32 @@ package id.web.agentvaedah.strideway.ui.record
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import id.web.agentvaedah.strideway.core.geo.Geo
 import id.web.agentvaedah.strideway.core.model.Athlete
 import id.web.agentvaedah.strideway.core.model.LatLon
 import id.web.agentvaedah.strideway.core.model.Sport
+import id.web.agentvaedah.strideway.core.route.Cue
+import id.web.agentvaedah.strideway.core.route.CueSheet
+import id.web.agentvaedah.strideway.core.route.Maneuver
+import id.web.agentvaedah.strideway.core.route.NavState
+import id.web.agentvaedah.strideway.core.route.Navigator
+import id.web.agentvaedah.strideway.core.training.Workout
+import id.web.agentvaedah.strideway.core.training.WorkoutState
 import id.web.agentvaedah.strideway.data.ble.BleHub
+import id.web.agentvaedah.strideway.data.db.RouteEntity
 import id.web.agentvaedah.strideway.data.location.GpsSource
 import id.web.agentvaedah.strideway.data.prefs.MapBase
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
-import id.web.agentvaedah.strideway.data.db.RouteEntity
-import id.web.agentvaedah.strideway.core.route.NavState
-import id.web.agentvaedah.strideway.core.training.WorkoutState
 import id.web.agentvaedah.strideway.data.remote.weather.WeatherRepository
 import id.web.agentvaedah.strideway.data.remote.weather.WeatherState
 import id.web.agentvaedah.strideway.data.repo.RouteRepository
-import id.web.agentvaedah.strideway.service.RecordingCueRunner
-import id.web.agentvaedah.strideway.service.WorkoutSession
-import id.web.agentvaedah.strideway.core.training.Workout
 import id.web.agentvaedah.strideway.service.HardwareKey
 import id.web.agentvaedah.strideway.service.HardwareKeyBus
 import id.web.agentvaedah.strideway.service.RecordingController
+import id.web.agentvaedah.strideway.service.RecordingCueRunner
 import id.web.agentvaedah.strideway.service.RecordingState
+import id.web.agentvaedah.strideway.service.WorkoutSession
+import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,7 +40,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** SPLIT: map 75% with a compact metrics strip. METRICS: big numbers full screen. MAP: map only. */
 enum class DisplayMode { SPLIT, METRICS, MAP }
@@ -42,7 +47,11 @@ enum class DisplayMode { SPLIT, METRICS, MAP }
 /** FOLLOW tracks the rider heading-up; FREE after the user pans; OVERVIEW fits route and track. */
 enum class CameraMode { FOLLOW, FREE, OVERVIEW }
 
-data class NavRoute(val id: Long, val name: String, val points: List<LatLon>)
+data class NavRoute(val id: Long, val name: String, val points: List<LatLon>, val maneuvers: List<Maneuver> = emptyList()) {
+    /** Turns for the list before the start; imported routes get them from the line's geometry. */
+    val cues: List<Cue> by lazy { CueSheet.of(points, maneuvers.ifEmpty { Navigator.fromGeometry(points) }) }
+    val lengthM: Double by lazy { points.zipWithNext { a, b -> Geo.distanceM(a, b) }.sum() }
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -91,7 +100,7 @@ class RecordViewModel @Inject constructor(
         } else {
             flow<NavRoute?> {
                 val r = routes.get(id)
-                emit(r?.let { NavRoute(it.id, it.name, routes.points(id).map { p -> LatLon(p.lat, p.lon) }) })
+                emit(r?.let { NavRoute(it.id, it.name, routes.points(id).map { p -> LatLon(p.lat, p.lon) }, routes.maneuvers(id)) })
             }
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)

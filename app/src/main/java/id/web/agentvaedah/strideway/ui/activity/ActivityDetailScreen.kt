@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,7 +27,6 @@ import androidx.compose.material.icons.outlined.AltRoute
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
@@ -64,8 +65,10 @@ import id.web.agentvaedah.strideway.ui.components.EmptyState
 import id.web.agentvaedah.strideway.ui.components.LineChart
 import id.web.agentvaedah.strideway.ui.components.LoadingState
 import id.web.agentvaedah.strideway.ui.components.Series
+import id.web.agentvaedah.strideway.ui.motion.staggeredEnter
 import id.web.agentvaedah.strideway.ui.theme.MetricText
 import id.web.agentvaedah.strideway.ui.theme.Palette
+import id.web.agentvaedah.strideway.ui.you.Medal
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -181,7 +184,7 @@ private fun DetailBody(
     onExportTcx: () -> Unit,
 ) {
     val base by vm.mapBase.collectAsStateWithLifecycle()
-    val badges by vm.badges.collectAsStateWithLifecycle()
+    val achievements by vm.achievements.collectAsStateWithLifecycle()
     val photos by vm.photos.collectAsStateWithLifecycle()
     var progress by remember { mutableStateOf<Float?>(null) }
     val a = s.activity
@@ -196,12 +199,29 @@ private fun DetailBody(
                 color = Palette.TextMuted,
             )
         }
-        if (badges.isNotEmpty()) {
-            FlowRow(
-                Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) { badges.forEach { PrBadge(it.label) } }
+        if (achievements.isNotEmpty()) {
+            Text("Pencapaian", style = MaterialTheme.typography.titleSmall, color = Palette.TextMuted, modifier = Modifier.padding(start = 16.dp, top = 10.dp))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                itemsIndexed(achievements, key = { _, it -> it.first.name }) { i, (key, rank) ->
+                    Row(
+                        Modifier
+                            .staggeredEnter(i)
+                            .background(Palette.Surface, MaterialTheme.shapes.large)
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Medal(rank, 34.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(key.label, style = MaterialTheme.typography.labelLarge, color = Palette.Text, maxLines = 1)
+                            Text(if (rank == 1) "Rekor pribadi" else "Terbaik ke-$rank", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+                        }
+                    }
+                }
+            }
         }
         if (a.description.isNotBlank()) {
             Text(a.description, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
@@ -298,11 +318,11 @@ private fun ChartBlock(title: String, values: List<Float>, color: Color, fill: B
 @Composable
 fun PrBadge(label: String) {
     Row(
-        Modifier.background(Palette.Accent, MaterialTheme.shapes.small).padding(horizontal = 8.dp, vertical = 3.dp),
+        Modifier.background(Palette.Surface, MaterialTheme.shapes.small).padding(start = 3.dp, end = 8.dp, top = 3.dp, bottom = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.EmojiEvents, contentDescription = null, tint = Palette.OnAccent, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(4.dp))
-        Text("PR · $label", style = MaterialTheme.typography.labelMedium, color = Palette.OnAccent)
+        Medal(1, 20.dp)
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Palette.Text)
     }
 }

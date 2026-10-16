@@ -1,5 +1,6 @@
 package id.web.agentvaedah.strideway.ui.you
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,22 +10,29 @@ import id.web.agentvaedah.strideway.core.history.HistoryFilter
 import id.web.agentvaedah.strideway.core.history.HistoryItem
 import id.web.agentvaedah.strideway.core.history.MonthGroup
 import id.web.agentvaedah.strideway.core.model.LatLon
-import id.web.agentvaedah.strideway.core.records.RecordHolder
 import id.web.agentvaedah.strideway.core.model.Sport
+import id.web.agentvaedah.strideway.core.records.RecordHolder
+import id.web.agentvaedah.strideway.core.records.RecordKey
+import id.web.agentvaedah.strideway.core.records.RecordRank
 import id.web.agentvaedah.strideway.core.stats.ProgressStats
+import id.web.agentvaedah.strideway.core.stats.StatBucket
 import id.web.agentvaedah.strideway.core.stats.StatMetric
 import id.web.agentvaedah.strideway.core.stats.StatRange
 import id.web.agentvaedah.strideway.core.stats.StatSeries
-import id.web.agentvaedah.strideway.core.stats.StatBucket
 import id.web.agentvaedah.strideway.core.stats.StreakInfo
 import id.web.agentvaedah.strideway.core.stats.Streaks
 import id.web.agentvaedah.strideway.data.db.ActivityEntity
+import id.web.agentvaedah.strideway.data.files.ProfilePhoto
 import id.web.agentvaedah.strideway.data.prefs.SettingsRepository
 import id.web.agentvaedah.strideway.data.prefs.UserProfile
 import id.web.agentvaedah.strideway.data.repo.ActivityRepository
 import id.web.agentvaedah.strideway.data.repo.RecordsRepository
 import id.web.agentvaedah.strideway.data.repo.toStat
 import id.web.agentvaedah.strideway.ui.home.privatePath
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,10 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.ZoneId
-import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 data class TrophyItem(val id: ChallengeId, val month: YearMonth)
 
@@ -49,6 +54,9 @@ data class ProgressState(
     val trophies: List<TrophyItem>,
     val activities: List<Pair<ActivityEntity, List<LatLon>>>,
     val records: List<RecordHolder>,
+    val recordTop: Map<RecordKey, List<RecordRank>>,
+    val recordPrevious: Map<RecordKey, Double>,
+    val activityById: Map<Long, ActivityEntity>,
     val badges: Map<Long, List<String>>,
     val history: List<MonthGroup>,
     val filter: HistoryFilter,
@@ -58,8 +66,9 @@ data class ProgressState(
 @HiltViewModel
 class ProgressViewModel @Inject constructor(
     activities: ActivityRepository,
-    settings: SettingsRepository,
+    private val settings: SettingsRepository,
     records: RecordsRepository,
+    private val photos: ProfilePhoto,
 ) : ViewModel() {
     private val filter = MutableStateFlow(HistoryFilter())
     private val zone = ZoneId.systemDefault()
@@ -86,12 +95,26 @@ class ProgressViewModel @Inject constructor(
             trophies = awards.mapNotNull { Achievements.parse(it) }.sortedByDescending { it.second }.map { TrophyItem(it.first, it.second) },
             activities = list.map { it to privatePath(it, privacy) },
             records = rec.holders.values.sortedBy { it.key.ordinal },
+            recordTop = rec.top,
+            recordPrevious = rec.previous,
+            activityById = list.associateBy { it.id },
             badges = list.associate { a -> a.id to rec.badgesFor(a.id).map { it.label } },
             history = HistoryFilter.groupByMonth(f.apply(list.map { it.toHistory() }, zone), zone),
             filter = f,
             totalActivities = list.size,
         )
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setPhoto(uri: Uri) {
+        viewModelScope.launch { photos.save(uri)?.let { settings.setProfilePhoto(it.absolutePath) } }
+    }
+
+    fun removePhoto() {
+        viewModelScope.launch {
+            photos.delete()
+            settings.setProfilePhoto(null)
+        }
+    }
 
     fun setRange(r: StatRange) { range.value = r }
     fun setMetric(m: StatMetric) { metric.value = m }

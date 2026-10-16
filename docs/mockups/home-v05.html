@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strideway 0.5 Mockup</title>
+<style>
+@font-face { font-family: "Strideway Sans"; src: url("../../assets/fonts/StridewaySans-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; }
+@font-face { font-family: "Outfit"; src: url("../../app/src/main/res/font/outfit_regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "Outfit"; src: url("../../app/src/main/res/font/outfit_medium.ttf") format("truetype"); font-weight: 500; }
+@font-face { font-family: "Outfit"; src: url("../../app/src/main/res/font/outfit_semibold.ttf") format("truetype"); font-weight: 600; }
+@font-face { font-family: "Outfit"; src: url("../../app/src/main/res/font/outfit_bold.ttf") format("truetype"); font-weight: 700; }
+
+:root {
+  --signal: #FF4F00; --ink: #0A0A0B; --amber: #FFB000;
+  --gold: #E0A400; --silver: #9AA0A6; --bronze: #B8733A;
+  --page: #E4E4E7; --page-text: #0A0A0B; --page-muted: #5E5E66;
+}
+.theme-dark {
+  --bg: #0A0A0B; --surface: #141416; --surface-high: #1D1D20; --outline: #2E2E33;
+  --text: #F4F4F5; --muted: #A6A6AD; --accent: #FF4F00; --on-accent: #0A0A0B;
+  --map-land: #17181B; --map-park: #1B2620; --map-water: #14202B; --map-road: #2A2B30; --map-road-major: #3A3B42;
+  --info: #5AA9FF; --up: #2FB765;
+}
+.theme-light {
+  --bg: #F3F3F4; --surface: #FFFFFF; --surface-high: #E9E9EB; --outline: #D4D4D8;
+  --text: #0A0A0B; --muted: #5E5E66; --accent: #C23B00; --on-accent: #FFFFFF;
+  --map-land: #EEEDEA; --map-park: #D9E7D3; --map-water: #C9DCEB; --map-road: #FFFFFF; --map-road-major: #FFE7C2;
+  --info: #1F6FD1; --up: #126B40;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-text); font-family: "Outfit", system-ui, sans-serif; }
+header.page { max-width: 1200px; margin: 0 auto; padding: 24px 16px 8px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+header.page h1 { font-family: "Strideway Sans", "Outfit", sans-serif; font-style: italic; font-size: 34px; margin: 0; letter-spacing: -0.01em; }
+header.page p { margin: 4px 0 0; color: var(--page-muted); max-width: 60ch; line-height: 1.45; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.controls button { font: 600 14px "Outfit", sans-serif; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #C4C4CA; background: #fff; color: #0A0A0B; cursor: pointer; }
+.controls button[aria-pressed="true"] { background: #0A0A0B; color: #fff; border-color: #0A0A0B; }
+.controls button:focus-visible, .phone button:focus-visible, .phone a:focus-visible { outline: 3px solid #1F6FD1; outline-offset: 2px; }
+
+main { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 32px 24px; justify-items: center; }
+@media (max-width: 400px) { main { grid-template-columns: 1fr; } }
+figure { margin: 0; width: 100%; max-width: 360px; }
+figcaption { margin: 12px 4px 0; }
+figcaption strong { display: block; font-size: 16px; }
+figcaption span { color: var(--page-muted); font-size: 14px; line-height: 1.45; }
+
+/* Phone frame */
+.phone { width: 100%; max-width: 360px; height: 780px; border-radius: 28px; overflow: hidden; position: relative; background: var(--bg); color: var(--text); box-shadow: 0 1px 0 #0001, 0 12px 32px -12px #0004; display: flex; flex-direction: column; }
+.status { height: 28px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.screen { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 16px 16px; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+nav.bottom { flex: none; height: 64px; border-top: 1px solid var(--outline); background: var(--surface); display: grid; grid-template-columns: repeat(5, 1fr); }
+nav.bottom button { all: unset; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; font-weight: 500; color: var(--muted); cursor: pointer; }
+nav.bottom button.on { color: var(--text); }
+nav.bottom button.on svg { color: var(--accent); }
+nav.bottom svg { width: 22px; height: 22px; }
+nav.bottom .rec { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
+nav.bottom .rec svg { color: var(--on-accent) !important; }
+
+/* Type */
+.brand { font-family: "Strideway Sans", "Outfit", sans-serif; font-style: italic; font-weight: 700; letter-spacing: -0.01em; }
+.num { font-family: "Strideway Sans", "Outfit", sans-serif; font-style: italic; font-variant-numeric: tabular-nums; }
+.label { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.01em; }
+.muted { color: var(--muted); }
+h2.section { font-size: 15px; font-weight: 600; margin: 22px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+h2.section a { font-size: 13px; font-weight: 500; color: var(--accent); text-decoration: none; }
+
+/* Header today */
+.today { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 6px; }
+.today h1 { margin: 0; font-size: 34px; line-height: 1; }
+.today .date { margin-top: 4px; font-size: 14px; color: var(--muted); }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--surface-high); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: var(--text); border: 2px solid var(--accent); flex: none; }
+
+/* Cards */
+.card { background: var(--surface); border-radius: 16px; padding: 14px; position: relative; transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
+.tap { cursor: pointer; }
+.tap:active { transform: scale(0.97); }
+.bento { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.span2 { grid-column: span 2; }
+.big { font-size: 64px; line-height: 0.9; }
+.mid { font-size: 34px; line-height: 1; }
+.sm { font-size: 24px; line-height: 1; }
+.unit { font-family: "Outfit", sans-serif; font-style: normal; font-size: 14px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--surface-high); color: var(--text); }
+.btn { all: unset; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 15px; cursor: pointer; }
+.btn.ghost { background: var(--surface-high); color: var(--text); }
+
+/* Activity card */
+.act { padding: 0; overflow: hidden; }
+.act .head { display: flex; gap: 10px; align-items: center; padding: 12px 14px 10px; }
+.act .head .avatar { width: 32px; height: 32px; font-size: 12px; border-width: 0; }
+.act .title { font-weight: 600; font-size: 15px; }
+.act .meta { font-size: 12px; color: var(--muted); }
+.act .stats { display: grid; grid-template-columns: repeat(3, 1fr); padding: 10px 14px 14px; gap: 8px; }
+.act .stats div .num { font-size: 22px; }
+.map { display: block; width: 100%; height: 170px; }
+.medals { position: absolute; top: 10px; right: 12px; display: flex; gap: 4px; }
+
+/* Medals */
+.medal { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 11px "Outfit", sans-serif; color: #0A0A0B; box-shadow: inset 0 -2px 0 #0003; }
+.medal.g { background: var(--gold); } .medal.s { background: var(--silver); } .medal.b { background: var(--bronze); }
+.medal.lg { width: 44px; height: 44px; font-size: 18px; }
+
+/* Week bars */
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 64px; margin-top: 10px; }
+.week .bar { border-radius: 6px 6px 3px 3px; background: var(--surface-high); position: relative; transform-origin: bottom; }
+.week .bar.on { background: var(--accent); }
+.week .bar.today { outline: 2px solid var(--text); outline-offset: 2px; }
+.weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 6px; text-align: center; font-size: 11px; color: var(--muted); }
+
+/* Intensity strip */
+.strip { display: flex; align-items: end; gap: 2px; height: 46px; margin: 12px 0; }
+.strip i { display: block; flex: 1; border-radius: 3px; }
+
+/* Giant date (B) */
+.giant { display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: end; padding: 6px 0 2px; }
+.giant .d { font-size: 112px; line-height: 0.8; color: var(--text); }
+.giant .w { font-size: 26px; line-height: 1; }
+.giant .m { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+/* Profile */
+.prof { text-align: center; padding-top: 6px; }
+.prof .photo { width: 96px; height: 96px; border-radius: 50%; margin: 6px auto 10px; position: relative; background: linear-gradient(160deg, #3a3b42, #1d1d20); display: grid; place-items: center; font: 700 30px "Outfit", sans-serif; color: #F4F4F5; border: 3px solid var(--accent); }
+.prof .photo .cam { position: absolute; right: -2px; bottom: -2px; width: 32px; height: 32px; border-radius: 50%; background: var(--text); color: var(--bg); display: grid; place-items: center; border: 3px solid var(--bg); }
+.prof h3 { margin: 0; font-size: 22px; }
+.prof .bike { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.counts { display: grid; grid-template-columns: repeat(4, 1fr); margin: 16px 0 6px; }
+.counts div { padding: 4px 0; }
+.counts div + div { border-left: 1px solid var(--outline); }
+.counts .num { font-size: 24px; display: block; }
+.counts .label { font-size: 11px; }
+.bio { text-align: left; font-size: 14px; line-height: 1.5; margin: 12px 0 0; overflow: hidden; transition: max-height 320ms cubic-bezier(.2,.8,.2,1); }
+.bio.clamp { max-height: 63px; }
+.bio.open { max-height: 240px; }
+.more { all: unset; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; display: inline-block; padding: 10px 0; min-height: 24px; }
+.note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.tabs { display: flex; gap: 4px; background: var(--surface); padding: 4px; border-radius: 12px; margin-top: 10px; }
+.tabs button { all: unset; flex: 1; text-align: center; min-height: 40px; display: grid; place-items: center; border-radius: 9px; font-weight: 600; font-size: 14px; color: var(--muted); cursor: pointer; }
+.tabs button.on { background: var(--surface-high); color: var(--text); }
+
+/* PR cards */
+.prrow { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; }
+.prrow::-webkit-scrollbar { display: none; }
+.pr { flex: none; width: 210px; scroll-snap-align: start; background: var(--surface); border-radius: 16px; padding: 14px; position: relative; overflow: hidden; }
+.pr .dist { font-size: 13px; font-weight: 600; color: var(--muted); }
+.pr .time { font-size: 44px; line-height: 1; margin: 14px 0 6px; }
+.pr .delta { font-size: 12px; font-weight: 600; color: var(--accent); }
+.pr .when { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.pr .medal { position: absolute; top: 12px; right: 12px; }
+.pr.locked { background: transparent; border: 1.5px dashed var(--outline); }
+.pr.locked .time { color: var(--muted); font-size: 22px; font-family: "Outfit", sans-serif; font-style: normal; margin-top: 22px; }
+.podium { display: grid; gap: 8px; }
+.podium .row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; background: var(--surface); border-radius: 12px; }
+.podium .row .num { font-size: 22px; }
+.podium .row .t { font-weight: 600; font-size: 14px; }
+.podium .row .m { font-size: 12px; color: var(--muted); }
+.sport-switch { display: flex; gap: 6px; margin: 4px 0 12px; }
+.sport-switch .pill { min-height: 32px; padding: 0 14px; }
+.sport-switch .pill.on { background: var(--text); color: var(--bg); }
+
+
+/* Recording */
+.rec { display: flex; flex-direction: column; height: 100%; margin: 0 -16px -16px; }
+.rec-map { position: relative; flex: none; }
+.rec-map .map { height: 410px; }
+.rec-split .rec-map .map { height: 470px; }
+.rec-map.tall { flex: 1; overflow: hidden; }
+.rec-map.tall .map { height: 100%; }
+.puck { position: absolute; left: 47%; top: 52%; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(255,79,0,.25); }
+.navb { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 10px; align-items: center; background: #0A0A0B; color: #F4F4F5; padding: 10px 12px; border-radius: 14px; }
+.navb svg { color: var(--signal); flex: none; }
+.map-btns { position: absolute; right: 10px; top: 112px; display: grid; gap: 8px; }
+.map-btns span { width: 44px; height: 44px; border-radius: 12px; background: var(--surface); color: var(--text); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.rec-sheet { flex: 1; background: var(--bg); border-radius: 18px 18px 0 0; margin-top: -16px; position: relative; padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+.rec-full { padding: 0 16px 12px; gap: 8px; }
+.rec-mapfull { padding: 0; }
+.rec-top { display: flex; gap: 6px; flex-wrap: wrap; }
+.rec-top .hr svg { color: #E5484D; }
+.rec-top .live .dot { width: 8px; height: 8px; border-radius: 50%; background: #E5484D; display: inline-block; }
+.speed { display: flex; justify-content: space-between; align-items: end; }
+.speed.hero { display: block; margin-top: 12px; text-align: center; }
+.speed.hero .gauge-l { text-align: left; }
+.num.huge { font-size: 48px; line-height: .9; }
+.num.mega { font-size: 112px; line-height: .85; }
+.big-unit { font-size: 18px; }
+.trend { font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: 8px; background: var(--surface-high); margin-bottom: 8px; }
+.trend.up { color: var(--up); }
+.mrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mrow > div { background: var(--surface); border-radius: 10px; padding: 6px 8px; }
+.mrow .num { font-size: 18px; }
+.mrow .label { font-size: 11px; }
+.rec-split .rec-sheet { gap: 6px; padding-top: 8px; }
+.rec-split .rec-ctl { padding-top: 2px; }
+.rec-split .btn.pause { min-height: 52px; }
+.rec-split .btn.round { width: 46px; height: 46px; }
+.gauge { position: relative; height: 8px; border-radius: 4px; margin: 14px 0 6px; background: var(--surface-high); }
+.gauge i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: linear-gradient(90deg, var(--signal), var(--amber)); }
+.gauge span { position: absolute; top: -4px; width: 4px; height: 16px; margin-left: -2px; background: var(--text); border-radius: 2px; }
+.gauge-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.rec-ctl { margin-top: auto; display: flex; justify-content: center; align-items: center; gap: 16px; padding: 8px 16px 4px; }
+.rec-mapfull .rec-ctl { background: var(--bg); padding: 12px 16px 14px; }
+.btn.round { width: 52px; height: 52px; padding: 0; border-radius: 50%; }
+.btn.pause { min-height: 60px; padding: 0 30px; border-radius: 30px; font-size: 17px; }
+.speed-chip { position: absolute; left: 12px; bottom: 12px; background: #0A0A0B; color: #F4F4F5; border-radius: 16px; padding: 10px 14px 12px; min-width: 150px; }
+.speed-chip .label { color: #A6A6AD; }
+.speed-chip .num { font-size: 60px; line-height: .9; display: block; }
+.speed-chip .sub { font-size: 12px; color: #A6A6AD; margin-top: 4px; }
+.mini { position: absolute; right: 12px; bottom: 12px; display: grid; gap: 6px; }
+.locate { all: unset; position: absolute; right: 10px; bottom: 132px; width: 52px; height: 52px; border-radius: 50%; background: var(--surface); color: var(--info); display: grid; place-items: center; cursor: pointer; box-shadow: 0 2px 8px #0004; }
+.here-tag { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+.acc { position: absolute; width: 90px; height: 90px; margin: -34px 0 0 -34px; border-radius: 50%; background: rgba(90,169,255,.18); border: 1.5px solid rgba(90,169,255,.55); }
+.puck.arrow { display: grid; place-items: center; background: var(--info); box-shadow: 0 0 0 6px rgba(90,169,255,.25); width: 28px; height: 28px; margin: -3px 0 0 -3px; }
+.mini > div { background: var(--surface); border-radius: 12px; padding: 6px 10px; text-align: right; }
+.mini .num { font-size: 20px; display: block; }
+
+/* Motion */
+.in { opacity: 0; transform: translateY(14px); }
+.play .in { animation: rise 520ms cubic-bezier(.2,.8,.2,1) forwards; animation-delay: calc(var(--i, 0) * 70ms); }
+.play .week .bar { animation: grow 600ms cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(300ms + var(--i, 0) * 50ms); }
+.play .map .route { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw 1400ms cubic-bezier(.4,0,.2,1) 300ms forwards; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@keyframes grow { from { transform: scaleY(0.05); } to { transform: none; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .in { opacity: 1; transform: none; }
+  .play .in, .play .week .bar, .play .map .route { animation: none; }
+  .play .map .route { stroke-dashoffset: 0; }
+  .card, .bio { transition: none; }
+}
+</style>
+</head>
+<body>
+<header class="page">
+  <div>
+    <h1>Strideway 0.5 · Mockup</h1>
+    <p><a href="share-v05.html" style="color:inherit;font-weight:600">Mockup Bagikan dengan foto ada di halaman terpisah.</a> Home versi C dengan grafik latihan, tiga tampilan layar Rekam dengan kecepatan sekarang, profil baru, dan rekor pribadi. Angka kecepatan di mockup Rekam bergerak tiap detik seperti saat mengayuh. Peta adalah gambar contoh; di aplikasi memakai tile peta asli.</p>
+  </div>
+  <div class="controls" role="group" aria-label="Pengaturan pratinjau">
+    <button id="dark" aria-pressed="true">Gelap</button>
+    <button id="light" aria-pressed="false">Terang</button>
+    <button id="replay">Putar ulang animasi</button>
+  </div>
+</header>
+
+<main id="frames"></main>
+
+<template id="nav">
+  <nav class="bottom" aria-label="Navigasi utama">
+    <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>Peta</button>
+    <button><span class="rec"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Latihan</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>You</button>
+  </nav>
+</template>
+
+<script>
+const fmtDate = new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long" });
+const now = new Date();
+const dateText = fmtDate.format(now);
+const weekday = new Intl.DateTimeFormat("id-ID", { weekday: "long" }).format(now);
+const month = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(now);
+let uid = 0;
+
+// Example map: land, park, river, street grid, then the route on top with an Ink casing and Signal-to-amber gradient.
+function map(h = 170, route = "M40 140 C70 120 80 92 112 86 S160 100 182 70 S236 30 262 52 S300 112 330 96") {
+  const id = "g" + (++uid);
+  return `<svg class="map" style="height:${h}px" viewBox="0 0 360 ${h}" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Peta rute">
+    <defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0" stop-color="var(--signal)"/><stop offset="1" stop-color="var(--amber)"/></linearGradient></defs>
+    <rect width="360" height="${h}" fill="var(--map-land)"/>
+    <path d="M190 0 L260 0 L250 60 L205 70 Z" fill="var(--map-park)"/>
+    <path d="M20 ${h} C70 ${h-40} 120 ${h-30} 160 ${h-60} S240 ${h-90} 360 ${h-70} L360 ${h} Z" fill="var(--map-park)" opacity=".7"/>
+    <path d="M-10 30 C60 50 110 20 170 40 S280 80 370 60" stroke="var(--map-water)" stroke-width="14" fill="none"/>
+    <g stroke="var(--map-road)" stroke-width="3">
+      ${[30,75,120,165,210,255,300,345].map(x => `<line x1="${x}" y1="0" x2="${x-24}" y2="${h}"/>`).join("")}
+      ${[25,65,105,145].map(y => `<line x1="0" y1="${y}" x2="360" y2="${y+10}"/>`).join("")}
+    </g>
+    <g stroke="var(--map-road-major)" stroke-width="6"><line x1="0" y1="${h*0.55}" x2="360" y2="${h*0.45}"/><line x1="150" y1="0" x2="120" y2="${h}"/></g>
+    <path d="${route}" stroke="var(--ink)" stroke-opacity=".85" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="route" style="--len:520" d="${route}" stroke="url(#${id})" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="40" cy="140" r="7" fill="#fff"/><circle cx="40" cy="140" r="4" fill="#2FB765"/>
+    <circle cx="330" cy="96" r="7" fill="#fff"/><circle cx="330" cy="96" r="4" fill="var(--ink)"/>
+  </svg>`;
+}
+
+function activity(i, title, meta, d, t, e, medals = "") {
+  return `<article class="card act tap in" style="--i:${i}" tabindex="0">
+    <div class="head"><div class="avatar">RA</div><div><div class="title">${title}</div><div class="meta">${meta}</div></div></div>
+    <div style="position:relative">${map()}${medals ? `<div class="medals">${medals}</div>` : ""}</div>
+    <div class="stats">
+      <div><div class="label">Jarak</div><span class="num" data-count="${d}" data-dec="1">${d}</span><span class="unit">km</span></div>
+      <div><div class="label">Waktu</div><span class="num">${t}</span></div>
+      <div><div class="label">Naik</div><span class="num" data-count="${e.replace(".", "")}">${e}</span><span class="unit">m</span></div>
+    </div>
+  </article>`;
+}
+
+const header = (i) => `<div class="today in" style="--i:${i}"><div><h1 class="brand">Today</h1><div class="date">${dateText}</div></div><div class="avatar" aria-label="Profil">RA</div></div>`;
+
+const week = (i) => `<div class="in" style="--i:${i}">
+  <div class="week" aria-label="Jarak per hari minggu ini">${[22,0,35,48,14,62,0].map((v, k) => `<div class="bar ${v ? "on" : ""} ${k === 4 ? "today" : ""}" style="--i:${k};height:${Math.max(8, v)}px"></div>`).join("")}</div>
+  <div class="weekdays">${["Sen","Sel","Rab","Kam","Jum","Sab","Min"].map(d => `<span>${d}</span>`).join("")}</div>
+</div>`;
+
+const workout = (i, compact = false) => `<section class="card tap in" style="--i:${i}">
+  <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+    <div><div class="label">Latihan hari ini · Build minggu 3</div><div style="font-weight:600;font-size:17px;margin-top:4px">Sweet Spot 2×20</div></div>
+    <span class="pill">1j 10m</span>
+  </div>
+  <div class="strip" aria-hidden="true">${[30,30,45,45,82,82,82,82,40,82,82,82,82,30,30].map(v => `<i style="height:${v}%;background:${v > 70 ? "var(--accent)" : v > 40 ? "var(--amber)" : "var(--surface-high)"}"></i>`).join("")}</div>
+  ${compact ? "" : `<div style="display:flex;gap:8px"><button class="btn">Kayuh sesi ini</button><button class="btn ghost">Detail</button></div>`}
+</section>`;
+
+const variants = [
+  {
+    name: "Home · versi C final",
+    note: "Header Today dan tanggal, ringkasan minggu, grafik latihan (beban per hari minggu ini dan profil sesi hari ini), lalu kartu peta besar.",
+    body: () => `${header(0)}
+      <section class="card in" style="--i:1;margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div><div class="label">Minggu ini</div><span class="num sm" data-count="181">181</span><span class="unit">km</span></div>
+        <div><div class="label">Naik</div><span class="num sm" data-count="2310">2310</span><span class="unit">m</span></div>
+        <div><div class="label">Form</div><span class="num sm" data-count="12" data-sign="1">+12</span></div>
+      </section>
+      <section class="card tap in" style="--i:2;margin-top:10px" aria-label="Grafik latihan">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <div class="label">Beban latihan minggu ini</div>
+          <div><span class="num sm" data-count="412">412</span><span class="unit">/ 520 TSS</span></div>
+        </div>
+        <div class="week" aria-label="Beban latihan per hari">${[38,0,52,64,0,58,0].map((v, k) => `<div class="bar ${v ? "on" : ""} ${k === 3 ? "today" : ""}" style="--i:${k};height:${Math.max(8, v)}px"></div>`).join("")}</div>
+        <div class="weekdays">${["Sen","Sel","Rab","Kam","Jum","Sab","Min"].map(d => `<span>${d}</span>`).join("")}</div>
+        <div style="height:1px;background:var(--outline);margin:14px 0 12px"></div>
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+          <div><div class="label">Latihan hari ini · Build minggu 3</div><div style="font-weight:600;font-size:16px;margin-top:4px">Sweet Spot 2×20</div></div>
+          <span class="pill">1j 10m</span>
+        </div>
+        <div class="strip" aria-label="Profil intensitas sesi">${[30,30,45,45,82,82,82,82,40,82,82,82,82,30,30].map(v => `<i style="height:${v}%;background:${v > 70 ? "var(--accent)" : v > 40 ? "var(--amber)" : "var(--surface-high)"}"></i>`).join("")}</div>
+        <div style="display:flex;gap:8px"><button class="btn">Kayuh sesi ini</button><button class="btn ghost">Rencana</button></div>
+      </section>
+      <h2 class="section">Aktivitas <a href="#">Semua</a></h2>
+      <div style="display:grid;gap:12px">
+        ${activity(3, "Gowes pagi Sentul", "Kemarin · 06.12 · Ride", "62,4", "2j 31m", "1.084", `<span class="medal g">1</span><span class="medal b">3</span>`)}
+        ${activity(4, "Recovery sore", "Selasa · 17.40 · Ride", "24,8", "58m", "120")}
+      </div>`,
+  },
+  {
+    name: "Rekam · Split (peta + metrik)",
+    note: "Peta lebih luas, panel metrik ringkas: kecepatan sekarang paling besar dengan grafik 60 detik terakhir (garis putus-putus = rata-rata), lalu satu baris Waktu, Jarak, Rata-rata/maks. Geser panel ke atas untuk metrik lain.",
+    rec: true,
+    body: () => `<div class="rec rec-split">
+      <div class="rec-map">${map(470, "M30 270 C60 240 90 200 120 190 S170 170 190 130 S230 80 250 60")}<div class="puck"></div>${navBanner}
+        <div class="map-btns"><span>3D</span><span>◎</span></div></div>
+      <div class="rec-sheet">
+        ${recTop}
+        <div class="speed in" style="--i:0"><div><div class="label">Kecepatan</div><span class="num huge" data-live="32.4">32,4</span><span class="unit big-unit">km/j</span></div>
+          <div class="trend up" aria-label="Naik dibanding 10 detik lalu">▲ 2,1</div></div>
+        ${speedSpark(300, 26)}
+        <div class="mrow in" style="--i:1"><div><div class="label">Waktu</div><span class="num">1:12:40</span></div><div><div class="label">Jarak</div><span class="num">38,62</span><span class="unit">km</span></div><div><div class="label">Rata · maks</div><span class="num">31,9</span><span class="unit">/ 54,8</span></div></div>
+        ${controls}
+      </div></div>`,
+  },
+  {
+    name: "Rekam · Metrik penuh",
+    note: "Layar tanpa peta untuk dilihat sekilas sambil mengayuh: kecepatan raksasa di tengah atas, lalu bento Waktu, Jarak, Rata-rata, Maks, HR, Power, Naik, Gradien.",
+    rec: true,
+    body: () => `<div class="rec rec-full">
+      ${recTop}
+      <div class="speed hero in" style="--i:0"><div class="label">Kecepatan sekarang</div><div style="display:flex;justify-content:center;align-items:baseline;gap:6px;margin-top:6px"><span class="num mega" data-live="32.4">32,4</span><span class="unit big-unit">km/j</span></div>
+        <div class="gauge" aria-label="Posisi kecepatan antara rata-rata dan maks"><i style="width:59%"></i><span style="left:58%"></span></div>
+        <div class="gauge-l"><span>0</span><span>rata-rata 31,9</span><span>maks 54,8</span></div></div>
+      ${speedSpark(320, 40)}
+      <div class="bento in" style="--i:1;margin-top:10px">
+        <div class="card"><div class="label">Waktu</div><span class="num mid">1:12:40</span></div>
+        <div class="card"><div class="label">Jarak</div><span class="num mid">38,62</span><span class="unit">km</span></div>
+        <div class="card"><div class="label">Rata-rata</div><span class="num sm">31,9</span><span class="unit">km/j</span></div>
+        <div class="card"><div class="label">Maks</div><span class="num sm">54,8</span><span class="unit">km/j</span></div>
+        <div class="card"><div class="label">Detak jantung</div><span class="num sm">148</span><span class="unit">bpm · Z3</span></div>
+        <div class="card"><div class="label">Power</div><span class="num sm">212</span><span class="unit">W · 3 dtk</span></div>
+        <div class="card"><div class="label">Naik</div><span class="num sm">612</span><span class="unit">m</span></div>
+        <div class="card"><div class="label">Gradien</div><span class="num sm">4,2</span><span class="unit">%</span></div>
+      </div>
+      ${controls}
+    </div>`,
+  },
+  {
+    name: "Rekam · Peta penuh",
+    note: "Peta 3D mengikuti arah gerak. Panah posisi sekarang dengan lingkaran akurasi GPS, tombol Lokasi saya (kembali ke posisi setelah peta digeser), nama area saat ini, dan chip kecepatan besar di kiri bawah.",
+    rec: true,
+    body: () => `<div class="rec rec-mapfull">
+      <div class="rec-map tall">${map(640, "M40 600 C80 520 120 470 150 420 S200 330 210 260 S250 150 240 60")}<div class="acc" style="left:52%;top:64%"></div><div class="puck arrow" style="left:52%;top:64%"><svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M12 3l7 17-7-4-7 4z"/></svg></div>${navBanner}
+        <div class="map-btns"><span>3D</span><span>N</span></div>
+        <button class="locate" aria-label="Lokasi saya sekarang"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+        <div class="here-tag">Jl. Raya Puncak · Cisarua</div>
+        <div class="speed-chip"><div class="label">km/j</div><span class="num" data-live="32.4">32,4</span><div class="sub">rata 31,9 · maks 54,8</div></div>
+        <div class="mini"><div><span class="num">1:12:40</span><span class="label">waktu</span></div><div><span class="num">38,62</span><span class="label">km</span></div></div>
+      </div>
+      ${controls}
+    </div>`,
+  },
+  {
+    name: "Profil baru",
+    note: "Foto profil bisa diunggah (ketuk ikon kamera), bio dengan Lihat selengkapnya, total aktivitas, minggu beruntun, dan slot Followers/Following yang aktif setelah ada akun online.",
+    body: () => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0"><h1 class="brand" style="margin:0;font-size:26px">You</h1><button class="btn ghost" style="min-height:40px;padding:0 12px" aria-label="Pengaturan"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button></div>
+      <section class="prof in" style="--i:0">
+        <div class="photo">RA<span class="cam" aria-label="Ganti foto profil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span></div>
+        <h3>Rizky Ananda</h3>
+        <div class="bike">Road bike · Polygon Strattos S5</div>
+      </section>
+      <section class="counts in" style="--i:1" aria-label="Ringkasan profil">
+        <div><span class="num" data-count="148">148</span><span class="label">Aktivitas</span></div>
+        <div><span class="num" data-count="9">9</span><span class="label">Mgg beruntun</span></div>
+        <div><span class="num muted">–</span><span class="label">Followers</span></div>
+        <div><span class="num muted">–</span><span class="label">Following</span></div>
+      </section>
+      <div class="note in" style="--i:1;text-align:center">Followers dan Following aktif setelah akun Strideway online tersedia.</div>
+      <div class="in" style="--i:2">
+        <p class="bio clamp">Gowes Sentul dan Puncak tiap akhir pekan. Lagi persiapan Bromo KOM bulan Desember, target di bawah 2 jam 30 menit. Weekday indoor di trainer, sweet spot dan VO2max. Ngopi setelah gowes itu wajib.</p>
+        <button class="more" data-bio>Lihat selengkapnya</button>
+      </div>
+      <div class="tabs in" style="--i:3" role="tablist"><button class="on" role="tab" aria-selected="true">Progress</button><button role="tab" aria-selected="false">Aktivitas</button></div>
+      <h2 class="section">Rekor pribadi <a href="#">Semua</a></h2>
+      <div class="prrow in" style="--i:4">
+        <div class="pr"><span class="medal g">1</span><div class="dist">40 km</div><div class="num time">1:12:08</div><div class="delta">0:42 lebih cepat</div><div class="when">12 Okt · Gowes pagi Sentul</div></div>
+        <div class="pr"><span class="medal g">1</span><div class="dist">20 km</div><div class="num time">33:51</div><div class="delta">PR baru</div><div class="when">5 Okt · TT Jagorawi</div></div>
+      </div>`,
+  },
+  {
+    name: "Rekor pribadi",
+    note: "Kartu per jarak dengan medali emas/perak/perunggu, selisih dari rekor sebelumnya, dan tiga terbaik per jarak. Jarak yang belum ditempuh tampil sebagai target.",
+    body: () => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg><h1 class="brand" style="margin:0;font-size:26px">Rekor pribadi</h1></div>
+      <div class="sport-switch in" style="--i:0"><span class="pill on">Ride</span><span class="pill">Run</span></div>
+      <div class="prrow in" style="--i:1">
+        <div class="pr tap"><span class="medal lg g">1</span><div class="dist">40 km</div><div class="num time">1:12:08</div><div class="delta">0:42 lebih cepat</div><div class="when">12 Okt 2026</div></div>
+        <div class="pr tap"><span class="medal lg g">1</span><div class="dist">20 km</div><div class="num time">33:51</div><div class="delta">PR baru</div><div class="when">5 Okt 2026</div></div>
+        <div class="pr tap"><span class="medal lg g">1</span><div class="dist">10 km</div><div class="num time">16:02</div><div class="delta">0:09 lebih cepat</div><div class="when">28 Sep 2026</div></div>
+        <div class="pr locked"><div class="dist">100 km</div><div class="num time">Gowes 100 km untuk membuka</div></div>
+      </div>
+      <h2 class="section in" style="--i:2">40 km · tiga terbaik</h2>
+      <div class="podium">
+        <div class="row tap in" style="--i:3"><span class="medal lg g">1</span><div><div class="t">Gowes pagi Sentul</div><div class="m">12 Okt 2026 · 33,3 km/j</div></div><span class="num">1:12:08</span></div>
+        <div class="row tap in" style="--i:4"><span class="medal lg s">2</span><div><div class="t">Loop Bogor</div><div class="m">21 Sep 2026 · 32,9 km/j</div></div><span class="num">1:12:50</span></div>
+        <div class="row tap in" style="--i:5"><span class="medal lg b">3</span><div><div class="t">Puncak via Gadog</div><div class="m">30 Agu 2026 · 31,1 km/j</div></div><span class="num">1:17:11</span></div>
+      </div>
+      <h2 class="section in" style="--i:6">Lainnya</h2>
+      <div class="bento in" style="--i:7">
+        <div class="card"><div class="label">Terjauh</div><span class="num sm">142,6</span><span class="unit">km</span></div>
+        <div class="card"><div class="label">Naik terbanyak</div><span class="num sm">2.481</span><span class="unit">m</span></div>
+      </div>`,
+  },
+];
+
+
+const recTop = `<div class="rec-top"><span class="pill hr"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.3-9A5 5 0 0 1 12 6a5 5 0 0 1 9.3 6C19 16.5 12 21 12 21z"/></svg><b class="num">148</b> bpm · Z3</span><span class="pill live"><i class="dot"></i>Merekam</span><span class="pill">GPS kuat</span></div>`;
+const speedSpark = (w = 300, h = 44) => `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px" aria-label="Kecepatan 60 detik terakhir">
+  <defs><linearGradient id="spf${++uid}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+  <path d="M0 30 L20 28 L40 26 L60 22 L80 24 L100 18 L120 16 L140 20 L160 14 L180 12 L200 15 L220 10 L240 12 L260 9 L280 11 L300 8 L300 ${h} L0 ${h} Z" fill="url(#spf${uid})"/>
+  <polyline points="0,30 20,28 40,26 60,22 80,24 100,18 120,16 140,20 160,14 180,12 200,15 220,10 240,12 260,9 280,11 300,8" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+  <line x1="0" y1="20" x2="${w}" y2="20" stroke="var(--muted)" stroke-dasharray="3 4" stroke-width="1"/>
+</svg>`;
+const navBanner = `<div class="navb"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20V11a3 3 0 0 1 3-3h8"/><path d="M14 4l4 4-4 4"/></svg><div style="flex:1"><div class="num" style="font-size:26px;line-height:1">200 m</div><div style="font-weight:600;font-size:14px">Belok kanan</div></div><div style="text-align:right;font-size:12px;opacity:.85">Sisa 18,4 km<br>tiba 08.42</div></div>`;
+const controls = `<div class="rec-ctl"><button class="btn ghost round" aria-label="Kunci layar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button><button class="btn pause" aria-label="Jeda"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>Jeda</button><button class="btn ghost round" aria-label="Ganti tampilan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16"/></svg></button></div>`;
+
+const frames = document.getElementById("frames");
+const navHtml = document.getElementById("nav").innerHTML;
+frames.innerHTML = variants.map(v => `<figure>
+  <div class="phone theme-dark play">
+    <div class="status"><span>${now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span><span>5G · 82%</span></div>
+    <div class="screen">${v.body()}</div>
+    ${v.rec ? "" : navHtml}
+  </div>
+  <figcaption><strong>${v.name}</strong><span>${v.note}</span></figcaption>
+</figure>`).join("");
+
+// Profile tab sits on You, so its bottom-nav highlight moves there.
+document.querySelectorAll("figure").forEach((f, i) => {
+  if (i >= 4) {
+    const b = f.querySelectorAll("nav.bottom button");
+    b[0].classList.remove("on"); b[4].classList.add("on");
+  }
+});
+
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function countUp(root) {
+  root.querySelectorAll("[data-count]").forEach(el => {
+    const target = parseFloat(el.dataset.count);
+    const sign = el.dataset.sign && target > 0 ? "+" : "";
+    const fmt = n => sign + Math.round(n).toLocaleString("id-ID");
+    if (reduce) { el.textContent = fmt(target); return; }
+    const t0 = performance.now(), dur = 900;
+    const step = t => {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(target * e);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+// Decimal distances keep their printed text; only whole numbers count up.
+document.querySelectorAll("[data-dec='1']").forEach(el => el.removeAttribute("data-count"));
+countUp(document);
+
+
+const liveEls = document.querySelectorAll("[data-live]");
+if (!reduce) setInterval(() => {
+  liveEls.forEach(el => {
+    const base = parseFloat(el.dataset.live);
+    const v = Math.max(0, base + (Math.random() - 0.5) * 2.4);
+    el.textContent = v.toFixed(1).replace(".", ",");
+  });
+}, 1000);
+
+document.getElementById("replay").onclick = () => {
+  document.querySelectorAll(".phone").forEach(p => { p.classList.remove("play"); void p.offsetWidth; p.classList.add("play"); p.querySelector(".screen").scrollTop = 0; });
+  countUp(document);
+};
+function theme(dark) {
+  document.querySelectorAll(".phone").forEach(p => { p.classList.toggle("theme-dark", dark); p.classList.toggle("theme-light", !dark); });
+  document.getElementById("dark").setAttribute("aria-pressed", dark);
+  document.getElementById("light").setAttribute("aria-pressed", !dark);
+}
+document.getElementById("dark").onclick = () => theme(true);
+document.getElementById("light").onclick = () => theme(false);
+document.querySelectorAll("[data-bio]").forEach(b => b.onclick = () => {
+  const bio = b.previousElementSibling, open = bio.classList.toggle("open");
+  bio.classList.toggle("clamp", !open);
+  b.textContent = open ? "Tutup" : "Lihat selengkapnya";
+});
+</script>
+</body>
+</html>

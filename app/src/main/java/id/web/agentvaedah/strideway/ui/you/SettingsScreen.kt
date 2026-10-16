@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import id.web.agentvaedah.strideway.BuildConfig
 import id.web.agentvaedah.strideway.data.prefs.ThemeMode
 import id.web.agentvaedah.strideway.ui.components.BackTopBar
 import id.web.agentvaedah.strideway.ui.components.SectionTitle
@@ -124,7 +125,13 @@ fun SettingsScreen(
                     BackupStatus.Idle -> Unit
                 }
             }
-            Spacer(Modifier.height(32.dp))
+            Text(
+                "Strideway ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.TextMuted,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            )
+            Spacer(Modifier.height(16.dp))
         }
     }
 

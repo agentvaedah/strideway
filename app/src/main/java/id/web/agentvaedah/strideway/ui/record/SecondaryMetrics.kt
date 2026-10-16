@@ -21,16 +21,13 @@ import id.web.agentvaedah.strideway.service.RecordingState
 import id.web.agentvaedah.strideway.ui.theme.MetricText
 import id.web.agentvaedah.strideway.ui.theme.Palette
 
-/** Everything beyond the headline numbers, shown below them in the maximised view. */
+/** Everything beyond the headline numbers and the grid, shown below them in the maximised view. */
 @Composable
 fun SecondaryMetrics(state: RecordingState.Active) {
     val m = state.metrics
     Column {
         val watts = m.powerWatts ?: m.estimatedPowerWatts
-        SecondaryRow("Kecepatan sekarang", Format.oneDecimal(m.speedKmh), "km/j")
-        SecondaryRow("Kecepatan maks", Format.oneDecimal(m.maxSpeedKmh), "km/j")
         SecondaryRow("Cadence", m.cadence?.toString() ?: "--", "rpm")
-        SecondaryRow("Gradien", m.gradePercent?.let { Format.oneDecimal(it) } ?: "--", "%")
         SecondaryRow("Kalori", Format.integer(m.calories), "kkal")
         if (state.sport == Sport.RIDE) {
             SecondaryRow(if (m.powerWatts != null) "Power" else "Power estimasi", watts?.toString() ?: "--", "W")
