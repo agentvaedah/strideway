@@ -21,7 +21,7 @@
 
 <br/>
 
-<img src="assets/branding/mockup_final_showcase.png" alt="Strideway Master Interface Showcase" width="100%"/>
+<img src="assets/branding/mockup_v05_showcase.png" alt="Strideway Master Interface Showcase" width="100%"/>
 
 </div>
 
@@ -94,7 +94,7 @@ Brand Strideway dibangun dengan identitas visual yang tegas, fungsional, dan sar
 
 | Head Unit Cockpit (Nokia 5.3) | Strava-Style Analytics & 3D Route |
 |:---:|:---:|
-| <img src="assets/branding/mockup_headunit_nokia53.png" width="370" alt="Head Unit Cockpit View"/> | <img src="assets/branding/mockup_final_showcase.png" width="370" alt="Analytics and 3D Route View"/> |
+| <img src="assets/branding/mockup_v05_cockpit.png" width="370" alt="Head Unit Cockpit View"/> | <img src="assets/branding/mockup_v05_showcase.png" width="370" alt="Analytics and 3D Route View"/> |
 
 </div>
 
